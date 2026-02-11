@@ -13,6 +13,7 @@ import io.ktor.server.response.*
 import kotlinx.serialization.json.Json
 import org.example.pipeline.api.di.apiModule
 import org.example.pipeline.api.routes.documentRoutes
+import org.example.pipeline.api.routes.healthRoutes
 import org.koin.ktor.ext.inject
 import org.koin.ktor.plugin.Koin
 import org.koin.logger.slf4jLogger
@@ -106,6 +107,7 @@ fun Application.module() {
         }
     }
 
-    // Register routes
+    // Register routes (health first — available even if other route setup fails)
+    healthRoutes()
     documentRoutes()
 }
