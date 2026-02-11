@@ -14,6 +14,7 @@ interface QueuePublisher {
      * (e.g., classification by the ML service).
      *
      * @param documentId The UUID (as string) of the document to process
+     * @param correlationId Optional request correlation ID for distributed tracing
      */
-    suspend fun publish(documentId: String)
+    suspend fun publish(documentId: String, correlationId: String? = null)
 }

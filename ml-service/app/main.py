@@ -10,8 +10,12 @@ import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.config import settings
+from app.correlation import CorrelationIdMiddleware
+from app.logging_config import configure_logging
+from app.metrics import MODELS_LOADED, PIPELINE_DURATION, PIPELINE_REQUESTS_TOTAL
 from app.pipeline import DocumentPipeline
 from app.schemas import (
     ClassifyRequest,
@@ -23,10 +27,7 @@ from app.services.bbox_extractor import BBoxExtractor
 from app.services.classifier import ClassifierService
 from app.services.ocr import OCRService
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s — %(message)s",
-)
+configure_logging()
 logger = logging.getLogger(__name__)
 
 # Global refs set during lifespan
@@ -59,11 +60,13 @@ async def lifespan(app: FastAPI):
         bbox_extractor=bbox_extractor,
     )
     _models_loaded = True
+    MODELS_LOADED.set(1)
 
     yield
 
     logger.info("Shutting down — clearing GPU cache.")
     _models_loaded = False
+    MODELS_LOADED.set(0)
     _pipeline = None
     try:
         import torch
@@ -75,6 +78,12 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="ML Classification Service", lifespan=lifespan)
+
+app.add_middleware(CorrelationIdMiddleware)
+Instrumentator(
+    should_group_status_codes=False,
+    excluded_handlers=["/health", "/metrics"],
+).instrument(app).expose(app)
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -101,12 +110,17 @@ def classify(request: ClassifyRequest):
     if not _models_loaded or _pipeline is None:
         raise HTTPException(status_code=503, detail="Models are still loading")
 
-    try:
-        classification, confidence = _pipeline.classify_document(request.content, request.mimeType)
-        return ClassifyResponse(classification=classification, confidence=confidence)
-    except Exception as exc:
-        logger.exception("Classification failed")
-        raise HTTPException(status_code=500, detail="Classification inference failed") from exc
+    with PIPELINE_DURATION.labels(endpoint="/classify").time():
+        try:
+            classification, confidence = _pipeline.classify_document(
+                request.content, request.mimeType
+            )
+            PIPELINE_REQUESTS_TOTAL.labels(endpoint="/classify", status="success").inc()
+            return ClassifyResponse(classification=classification, confidence=confidence)
+        except Exception as exc:
+            PIPELINE_REQUESTS_TOTAL.labels(endpoint="/classify", status="error").inc()
+            logger.exception("Classification failed")
+            raise HTTPException(status_code=500, detail="Classification inference failed") from exc
 
 
 @app.post("/classify-with-ocr", response_model=ClassifyWithOcrResponse)
@@ -125,15 +139,18 @@ def classify_with_ocr(request: ClassifyRequest):
     if not _models_loaded or _pipeline is None:
         raise HTTPException(status_code=503, detail="Models are still loading")
 
-    try:
-        classification, confidence, ocr_result = _pipeline.classify_and_ocr_document(
-            request.content, request.mimeType
-        )
-        return ClassifyWithOcrResponse(
-            classification=classification,
-            confidence=confidence,
-            ocr=ocr_result,
-        )
-    except Exception as exc:
-        logger.exception("Classification with OCR failed")
-        raise HTTPException(status_code=500, detail="Classification inference failed") from exc
+    with PIPELINE_DURATION.labels(endpoint="/classify-with-ocr").time():
+        try:
+            classification, confidence, ocr_result = _pipeline.classify_and_ocr_document(
+                request.content, request.mimeType
+            )
+            PIPELINE_REQUESTS_TOTAL.labels(endpoint="/classify-with-ocr", status="success").inc()
+            return ClassifyWithOcrResponse(
+                classification=classification,
+                confidence=confidence,
+                ocr=ocr_result,
+            )
+        except Exception as exc:
+            PIPELINE_REQUESTS_TOTAL.labels(endpoint="/classify-with-ocr", status="error").inc()
+            logger.exception("Classification with OCR failed")
+            raise HTTPException(status_code=500, detail="Classification inference failed") from exc

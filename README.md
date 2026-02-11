@@ -75,8 +75,13 @@ cd frontend && npm install && npm run dev
 ```bash
 curl localhost:8080/api/health              # API health check
 curl localhost:8080/api/documents           # API document list
+curl localhost:8080/metrics                 # API Prometheus metrics
+curl localhost:8081/metrics                 # Worker Prometheus metrics
 curl localhost:8000/health                  # ML service
+curl localhost:8000/metrics                 # ML service Prometheus metrics
 curl localhost:15672                        # RabbitMQ management UI
+curl localhost:9090/api/v1/targets          # Prometheus scrape targets
+curl localhost:3000/api/health              # Grafana dashboard
 ```
 
 ## Module Structure
@@ -92,7 +97,7 @@ curl localhost:15672                        # RabbitMQ management UI
 | `frontend/` | React SPA — document list, upload, viewers, OCR display, multi-select bulk delete |
 | `ml-service/` | Python FastAPI — zero-shot classification, OCR, bounding box detection |
 | `scripts/` | Dev environment management (`dev.sh`) |
-| `docker/` | Docker Compose for PostgreSQL, RabbitMQ, and ML service |
+| `docker/` | Docker Compose for PostgreSQL, RabbitMQ, ML service, Prometheus, and Grafana |
 | `config/detekt/` | Detekt linter configuration for Kotlin modules |
 
 ## API Endpoints
@@ -108,6 +113,7 @@ curl localhost:15672                        # RabbitMQ management UI
 | `DELETE` | `/api/documents/{id}` | Delete document and associated files |
 | `POST` | `/api/documents/{id}/retry` | Re-queue document for classification |
 | `GET` | `/api/health` | Liveness probe — returns `{"status":"ok"}` |
+| `GET` | `/metrics` | Prometheus metrics (Ktor HTTP, JVM, custom counters) |
 
 ## Frontend
 
@@ -136,13 +142,13 @@ For CPU-only mode, set `ML_DEVICE=cpu` and `ML_TORCH_DTYPE=float32` in the envir
 
 ## Tech Stack
 
-**Backend** — Kotlin 2.2, JVM 21, Gradle (Kotlin DSL) with version catalog + buildSrc convention plugin + configuration cache, Ktor 3.2 (Netty), kotlinx.serialization, Koin DI, Exposed DSL, Flyway, HikariCP, RabbitMQ (amqp-client), Kotlin Coroutines, SLF4J + Logback, HOCON config, **Detekt** (linting)
+**Backend** — Kotlin 2.2, JVM 21, Gradle (Kotlin DSL) with version catalog + buildSrc convention plugin + configuration cache, Ktor 3.2 (Netty), kotlinx.serialization, Koin DI, Exposed DSL, Flyway, HikariCP, RabbitMQ (amqp-client), Kotlin Coroutines, SLF4J + Logback (JSON via LogstashEncoder), Micrometer + Prometheus, HOCON config, **Detekt** (linting)
 
 **Frontend** — React 19, TypeScript 5, Vite 6, TanStack Router + Query + Form, Tailwind CSS v4, shadcn/ui, pdfjs-dist, openseadragon, Vitest + React Testing Library + MSW, Playwright, **ESLint 9** + **Prettier** (linting/formatting)
 
-**ML Service** — Python 3.12, FastAPI, Uvicorn, Transformers, PyTorch, PaddleOCR, PyMuPDF, Pydantic Settings, **Ruff** (linting/formatting)
+**ML Service** — Python 3.12, FastAPI, Uvicorn, Transformers, PyTorch, PaddleOCR, PyMuPDF, Pydantic Settings, prometheus-client + prometheus-fastapi-instrumentator, python-json-logger, **Ruff** (linting/formatting)
 
-**Infrastructure** — PostgreSQL 16, RabbitMQ 4, Docker Compose, NVIDIA CUDA 12.6 (optional), Lefthook (git hooks), Cocogitto (commit linting)
+**Infrastructure** — PostgreSQL 16, RabbitMQ 4, Docker Compose, Prometheus + Grafana, NVIDIA CUDA 12.6 (optional), Lefthook (git hooks), Cocogitto (commit linting)
 
 ## Testing
 
@@ -241,10 +247,12 @@ ML service uses `ML_`-prefixed env vars: `ML_DEVICE`, `ML_TORCH_DTYPE`, `ML_HF_H
 | 3 | Test coverage gaps (E2E, integration, error paths) | Done |
 | 4 | Documentation & code quality (Detekt, Ruff, ESLint, KDoc, docstrings, JSDoc) | Done |
 | 5 | Build & DevEx (Gradle config cache, Docker health checks) | Done |
-| 6 | Observability & logging (Prometheus metrics, correlation IDs) | Planned |
+| 6 | Observability & logging (Prometheus metrics, correlation IDs, structured logging) | Done |
 | 7 | Model explainability (per-label scores, attention attribution) | Planned |
 | 8 | CI/CD (GitHub Actions, Docker image builds, GHCR) | Planned |
 | 9 | Log ingestion & analytics — new Go service with dashboard | Planned |
+| 10 | WebSocket push updates | Planned |
+| 11 | Frontend observability | Planned |
 
 ## License
 

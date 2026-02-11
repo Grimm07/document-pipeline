@@ -16,7 +16,7 @@ import org.slf4j.LoggerFactory
  */
 class RabbitMQConsumer(
     private val connection: Connection,
-    private val messageHandler: suspend (String) -> Unit
+    private val messageHandler: suspend (String, String?) -> Unit
 ) {
     private val logger = LoggerFactory.getLogger(RabbitMQConsumer::class.java)
     private val json = Json { ignoreUnknownKeys = true }
@@ -48,7 +48,7 @@ class RabbitMQConsumer(
             }
             scope.launch {
                 try {
-                    messageHandler(docMessage.documentId)
+                    messageHandler(docMessage.documentId, docMessage.correlationId)
                     ch.basicAck(delivery.envelope.deliveryTag, false)
                 } catch (e: Exception) {
                     val requeue = !delivery.envelope.isRedeliver

@@ -87,7 +87,7 @@ class RabbitMQConsumerStressTest : FunSpec({
             val received = CopyOnWriteArrayList<String>()
             val allDone = CompletableDeferred<Unit>()
 
-            val consumer = RabbitMQConsumer(connection) { docId ->
+            val consumer = RabbitMQConsumer(connection) { docId, _ ->
                 received.add(docId)
                 if (received.size >= 50) allDone.complete(Unit)
             }
@@ -109,7 +109,7 @@ class RabbitMQConsumerStressTest : FunSpec({
             val received = CopyOnWriteArrayList<String>()
             val allDone = CompletableDeferred<Unit>()
 
-            val consumer = RabbitMQConsumer(connection) { docId ->
+            val consumer = RabbitMQConsumer(connection) { docId, _ ->
                 received.add(docId)
                 if (received.size >= 100) allDone.complete(Unit)
             }
@@ -139,7 +139,7 @@ class RabbitMQConsumerStressTest : FunSpec({
             // Error IDs are retried once (requeue) then DLQ'd — 20 handler calls for errors.
             // 40 success IDs are processed normally — 40 handler calls.
             // Total: 60 handler invocations with basicQos(1).
-            val consumer = RabbitMQConsumer(connection) { docId ->
+            val consumer = RabbitMQConsumer(connection) { docId, _ ->
                 if (docId in errorIds) {
                     throw RuntimeException("Simulated failure for $docId")
                 }
@@ -171,7 +171,7 @@ class RabbitMQConsumerStressTest : FunSpec({
             val received1 = CopyOnWriteArrayList<String>()
             val done1 = CompletableDeferred<Unit>()
 
-            val consumer1 = RabbitMQConsumer(connection) { docId ->
+            val consumer1 = RabbitMQConsumer(connection) { docId, _ ->
                 received1.add(docId)
                 if (received1.size >= 10) done1.complete(Unit)
             }
@@ -193,7 +193,7 @@ class RabbitMQConsumerStressTest : FunSpec({
             val received2 = CopyOnWriteArrayList<String>()
             val done2 = CompletableDeferred<Unit>()
 
-            val consumer2 = RabbitMQConsumer(connection) { docId ->
+            val consumer2 = RabbitMQConsumer(connection) { docId, _ ->
                 received2.add(docId)
                 if (received2.size >= 10) done2.complete(Unit)
             }

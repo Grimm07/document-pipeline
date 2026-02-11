@@ -4,6 +4,8 @@ import logging
 
 from PIL import Image
 
+from app.metrics import MODEL_LOAD_DURATION, OCR_INFERENCE_DURATION
+
 logger = logging.getLogger(__name__)
 
 
@@ -27,19 +29,20 @@ class OCRService:
             device: PyTorch device string (``cuda`` or ``cpu``).
             torch_dtype: PyTorch dtype name (e.g. ``float16``).
         """
-        import torch
-        from transformers import AutoModelForImageTextToText, AutoProcessor
+        with MODEL_LOAD_DURATION.labels(model_name=model_name).time():
+            import torch
+            from transformers import AutoModelForImageTextToText, AutoProcessor
 
-        dtype = getattr(torch, torch_dtype, torch.float16)
-        logger.info("Loading OCR model: %s (device=%s, dtype=%s)", model_name, device, dtype)
-        self._processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
-        self._model = AutoModelForImageTextToText.from_pretrained(
-            model_name,
-            torch_dtype=dtype,
-            device_map=device,
-            trust_remote_code=True,
-        )
-        logger.info("OCR model loaded.")
+            dtype = getattr(torch, torch_dtype, torch.float16)
+            logger.info("Loading OCR model: %s (device=%s, dtype=%s)", model_name, device, dtype)
+            self._processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
+            self._model = AutoModelForImageTextToText.from_pretrained(
+                model_name,
+                torch_dtype=dtype,
+                device_map=device,
+                trust_remote_code=True,
+            )
+            logger.info("OCR model loaded.")
 
     def extract_text(self, image: Image.Image) -> str:
         """Extract text from a single image using the OCR model.
@@ -50,20 +53,21 @@ class OCRService:
         Returns:
             Extracted text, stripped of leading/trailing whitespace.
         """
-        inputs = self._processor(images=image, return_tensors="pt")
-        inputs = {k: v.to(self._model.device) for k, v in inputs.items()}
-        generated_ids = self._model.generate(
-            **inputs,
-            do_sample=False,
-            max_new_tokens=4096,
-            stop_strings=["<|im_end|>"],
-            tokenizer=self._processor.tokenizer,
-        )
-        # Decode only the newly generated tokens (skip the input prompt tokens)
-        input_len = inputs["input_ids"].shape[1] if "input_ids" in inputs else 0
-        decoded = self._processor.tokenizer.decode(
-            generated_ids[0][input_len:], skip_special_tokens=True
-        )
+        with OCR_INFERENCE_DURATION.time():
+            inputs = self._processor(images=image, return_tensors="pt")
+            inputs = {k: v.to(self._model.device) for k, v in inputs.items()}
+            generated_ids = self._model.generate(
+                **inputs,
+                do_sample=False,
+                max_new_tokens=4096,
+                stop_strings=["<|im_end|>"],
+                tokenizer=self._processor.tokenizer,
+            )
+            # Decode only the newly generated tokens (skip the input prompt tokens)
+            input_len = inputs["input_ids"].shape[1] if "input_ids" in inputs else 0
+            decoded = self._processor.tokenizer.decode(
+                generated_ids[0][input_len:], skip_special_tokens=True
+            )
         return decoded.strip()
 
     def extract_text_from_images(self, images: list[Image.Image]) -> str:

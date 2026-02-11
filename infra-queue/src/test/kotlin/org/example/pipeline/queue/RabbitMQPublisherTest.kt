@@ -151,7 +151,7 @@ class RabbitMQPublisherTest : FunSpec({
 
             // Start a consumer so malformed message gets NACK'd to DLX
             val processed = CompletableDeferred<Unit>()
-            val consumer = RabbitMQConsumer(connection) { processed.complete(Unit) }
+            val consumer = RabbitMQConsumer(connection) { _, _ -> processed.complete(Unit) }
             consumer.start()
 
             // Publish raw non-JSON directly to the exchange

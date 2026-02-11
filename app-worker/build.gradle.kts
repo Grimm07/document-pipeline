@@ -31,6 +31,10 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.datetime)
 
+    // Observability
+    implementation(libs.micrometer.registry.prometheus)
+    implementation(libs.logstash.logback.encoder)
+
     // Logging
     implementation(libs.logback.classic)
 

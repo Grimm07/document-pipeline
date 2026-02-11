@@ -4,6 +4,8 @@ import logging
 
 from PIL import Image
 
+from app.metrics import BBOX_DETECTION_DURATION, MODEL_LOAD_DURATION
+
 logger = logging.getLogger(__name__)
 
 
@@ -20,17 +22,18 @@ class BBoxExtractor:
 
     def load(self) -> None:
         """Load the PaddleOCR detection model (lazy import for compatibility)."""
-        from paddleocr import PaddleOCR
+        with MODEL_LOAD_DURATION.labels(model_name="paddleocr-det").time():
+            from paddleocr import PaddleOCR
 
-        logger.info("Loading PaddleOCR detection model...")
-        self._ocr = PaddleOCR(
-            use_angle_cls=False,
-            lang="en",
-            det=True,
-            rec=False,
-            show_log=False,
-        )
-        logger.info("PaddleOCR detection model loaded.")
+            logger.info("Loading PaddleOCR detection model...")
+            self._ocr = PaddleOCR(
+                use_angle_cls=False,
+                lang="en",
+                det=True,
+                rec=False,
+                show_log=False,
+            )
+            logger.info("PaddleOCR detection model loaded.")
 
     def detect_boxes(self, image: Image.Image) -> list[dict]:
         """Detect text region bounding boxes in an image.
@@ -44,24 +47,25 @@ class BBoxExtractor:
         Returns:
             List of dicts with ``x``, ``y``, ``width``, ``height`` keys.
         """
-        import numpy as np
+        with BBOX_DETECTION_DURATION.time():
+            import numpy as np
 
-        img_array = np.array(image)
-        result = self._ocr.ocr(img_array, cls=False, rec=False)
+            img_array = np.array(image)
+            result = self._ocr.ocr(img_array, cls=False, rec=False)
 
-        boxes = []
-        if not result or not result[0]:
+            boxes = []
+            if not result or not result[0]:
+                return boxes
+
+            for polygon in result[0]:
+                xs = [p[0] for p in polygon]
+                ys = [p[1] for p in polygon]
+                boxes.append(
+                    {
+                        "x": float(min(xs)),
+                        "y": float(min(ys)),
+                        "width": float(max(xs) - min(xs)),
+                        "height": float(max(ys) - min(ys)),
+                    }
+                )
             return boxes
-
-        for polygon in result[0]:
-            xs = [p[0] for p in polygon]
-            ys = [p[1] for p in polygon]
-            boxes.append(
-                {
-                    "x": float(min(xs)),
-                    "y": float(min(ys)),
-                    "width": float(max(xs) - min(xs)),
-                    "height": float(max(ys) - min(ys)),
-                }
-            )
-        return boxes

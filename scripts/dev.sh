@@ -290,7 +290,7 @@ if ! $SKIP_API; then
   # line with [api] so you can tell backend output apart from frontend.
   # `$!` captures the PID of the last command in the background pipeline (sed),
   # which exits when Gradle exits (pipe closes), so it's a reliable proxy.
-  ./gradlew :app-api:run 2>&1 | sed 's/^/[api] /' &
+  ./gradlew :app-api:run -Dlogback.configurationFile=logback-text.xml 2>&1 | sed 's/^/[api] /' &
   API_PID=$!
 
   # Poll the API endpoint until it responds. Gradle compiles before Ktor
@@ -318,7 +318,7 @@ fi
 # Start background worker (RabbitMQ consumer → ML service)
 # ---------------------------------------------------------------------------
 if ! $SKIP_WORKER; then
-  ./gradlew :app-worker:run 2>&1 | sed 's/^/[worker] /' &
+  ./gradlew :app-worker:run -Dlogback.configurationFile=logback-text.xml 2>&1 | sed 's/^/[worker] /' &
   echo "[worker] Starting background worker..."
 fi
 

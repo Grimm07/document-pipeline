@@ -6,23 +6,37 @@ import io.ktor.server.application.*
 import io.ktor.server.config.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
+import io.ktor.server.metrics.micrometer.*
+import io.ktor.server.plugins.callid.*
+import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
+import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics
+import io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics
+import io.micrometer.core.instrument.binder.jvm.JvmThreadMetrics
+import io.micrometer.core.instrument.binder.system.ProcessorMetrics
+import io.micrometer.core.instrument.distribution.DistributionStatisticConfig
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
 import kotlinx.serialization.json.Json
 import org.example.pipeline.api.di.apiModule
 import org.example.pipeline.api.routes.documentRoutes
 import org.example.pipeline.api.routes.healthRoutes
+import org.example.pipeline.api.routes.metricsRoutes
 import org.koin.ktor.ext.inject
 import org.koin.ktor.plugin.Koin
 import org.koin.logger.slf4jLogger
 import org.slf4j.LoggerFactory
+import org.slf4j.event.Level
 
 private val logger = LoggerFactory.getLogger("Application")
 
 /** Default HTTP server port when SERVER_PORT env var is not set. */
 private const val DEFAULT_SERVER_PORT = 8080
+
+/** Maximum allowed length for correlation IDs. */
+private const val MAX_CALL_ID_LENGTH = 200
 
 /**
  * Entry point for the Document Pipeline API server.
@@ -47,11 +61,35 @@ fun main() {
  * Installs Koin DI, CORS, JSON content negotiation, status pages
  * error handling, and registers document API routes.
  */
+@Suppress("LongMethod") // Plugin installation is inherently verbose
 fun Application.module() {
     // Install Koin for dependency injection
     install(Koin) {
         slf4jLogger()
         modules(apiModule)
+    }
+
+    // Install CallId for correlation ID propagation
+    install(CallId) {
+        retrieveFromHeader(HttpHeaders.XRequestId)
+        generate { java.util.UUID.randomUUID().toString() }
+        verify { it.isNotEmpty() && it.length <= MAX_CALL_ID_LENGTH }
+        replyToHeader(HttpHeaders.XRequestId)
+    }
+
+    // Install CallLogging with MDC correlation ID
+    install(CallLogging) {
+        level = Level.INFO
+        callIdMdc("correlationId")
+    }
+
+    // Install Micrometer metrics with Prometheus registry
+    val prometheusMeterRegistry by inject<PrometheusMeterRegistry>()
+    install(MicrometerMetrics) {
+        registry = prometheusMeterRegistry
+        distributionStatisticConfig = DistributionStatisticConfig.Builder()
+            .percentilesHistogram(true).build()
+        meterBinders = listOf(JvmMemoryMetrics(), JvmGcMetrics(), JvmThreadMetrics(), ProcessorMetrics())
     }
 
     // Install CORS for frontend access
@@ -69,6 +107,8 @@ fun Application.module() {
         allowMethod(HttpMethod.Options)
         allowHeader(HttpHeaders.ContentType)
         allowHeader(HttpHeaders.Accept)
+        allowHeader(HttpHeaders.XRequestId)
+        exposeHeader(HttpHeaders.XRequestId)
     }
 
     // Install content negotiation with JSON
@@ -108,6 +148,8 @@ fun Application.module() {
     }
 
     // Register routes (health first — available even if other route setup fails)
+    // metricsRoutes before documentRoutes to avoid /{id} parameter match
     healthRoutes()
+    metricsRoutes()
     documentRoutes()
 }

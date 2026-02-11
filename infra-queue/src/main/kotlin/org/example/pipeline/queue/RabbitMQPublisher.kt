@@ -31,8 +31,8 @@ class RabbitMQPublisher(
         }
     }
 
-    override suspend fun publish(documentId: String): Unit = withContext(Dispatchers.IO) {
-        val message = DocumentMessage(documentId = documentId)
+    override suspend fun publish(documentId: String, correlationId: String?): Unit = withContext(Dispatchers.IO) {
+        val message = DocumentMessage(documentId = documentId, correlationId = correlationId)
         val body = json.encodeToString(message).toByteArray()
         val props = AMQP.BasicProperties.Builder()
             .contentType(QueueConstants.CONTENT_TYPE_JSON)

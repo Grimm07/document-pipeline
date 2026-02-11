@@ -4,6 +4,7 @@ import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.server.application.*
 import io.ktor.server.config.*
+import io.ktor.server.plugins.callid.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -92,7 +93,7 @@ fun Application.documentRoutes() {
                 )
 
                 val saved = documentRepository.insert(document)
-                queuePublisher.publish(saved.id)
+                queuePublisher.publish(saved.id, call.callId)
 
                 call.respond(HttpStatusCode.OK, saved.toResponse())
             }
@@ -230,7 +231,7 @@ fun Application.documentRoutes() {
                 }
 
                 documentRepository.resetClassification(idParam)
-                queuePublisher.publish(idParam)
+                queuePublisher.publish(idParam, call.callId)
 
                 val updated = documentRepository.getById(idParam)
                 if (updated == null) {

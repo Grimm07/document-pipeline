@@ -11,10 +11,13 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.config.*
+import io.ktor.server.plugins.callid.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import io.ktor.server.testing.*
+import io.micrometer.prometheusmetrics.PrometheusConfig
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
 import io.mockk.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -67,7 +70,11 @@ class DocumentRoutesTest : FunSpec({
                     single<FileStorageService> { mockStorage }
                     single<QueuePublisher> { mockPublisher }
                     single<HoconApplicationConfig> { hoconConfig }
+                    single { PrometheusMeterRegistry(PrometheusConfig.DEFAULT) }
                 })
+            }
+            install(CallId) {
+                generate { java.util.UUID.randomUUID().toString() }
             }
             install(ContentNegotiation) {
                 json(Json {
@@ -104,7 +111,7 @@ class DocumentRoutesTest : FunSpec({
                 coEvery { mockRepo.insert(any()) } answers {
                     firstArg<Document>()
                 }
-                coEvery { mockPublisher.publish(any()) } returns Unit
+                coEvery { mockPublisher.publish(any(), any()) } returns Unit
 
                 val response = client.post("/api/documents/upload") {
                     setBody(MultiPartFormDataContent(formData {
@@ -125,7 +132,7 @@ class DocumentRoutesTest : FunSpec({
 
                 coEvery { mockStorage.store(any(), any(), any()) } returns "2024/07/15/test.pdf"
                 coEvery { mockRepo.insert(any()) } answers { firstArg<Document>() }
-                coEvery { mockPublisher.publish(any()) } returns Unit
+                coEvery { mockPublisher.publish(any(), any()) } returns Unit
 
                 client.post("/api/documents/upload") {
                     setBody(MultiPartFormDataContent(formData {
@@ -146,7 +153,7 @@ class DocumentRoutesTest : FunSpec({
 
                 coEvery { mockStorage.store(any(), any(), any()) } returns "2024/07/15/test.pdf"
                 coEvery { mockRepo.insert(any()) } answers { firstArg<Document>() }
-                coEvery { mockPublisher.publish(any()) } returns Unit
+                coEvery { mockPublisher.publish(any(), any()) } returns Unit
 
                 client.post("/api/documents/upload") {
                     setBody(MultiPartFormDataContent(formData {
@@ -167,7 +174,7 @@ class DocumentRoutesTest : FunSpec({
 
                 coEvery { mockStorage.store(any(), any(), any()) } returns "2024/07/15/test.pdf"
                 coEvery { mockRepo.insert(any()) } answers { firstArg<Document>() }
-                coEvery { mockPublisher.publish(any()) } returns Unit
+                coEvery { mockPublisher.publish(any(), any()) } returns Unit
 
                 client.post("/api/documents/upload") {
                     setBody(MultiPartFormDataContent(formData {
@@ -178,7 +185,7 @@ class DocumentRoutesTest : FunSpec({
                     }))
                 }
 
-                coVerify { mockPublisher.publish(any()) }
+                coVerify { mockPublisher.publish(any(), any()) }
             }
         }
 
@@ -626,7 +633,7 @@ class DocumentRoutesTest : FunSpec({
                 val resetDoc = doc.copy(classification = "unclassified", confidence = null, ocrStoragePath = null)
                 coEvery { mockRepo.getById(doc.id) } returnsMany listOf(doc, resetDoc)
                 coEvery { mockRepo.resetClassification(doc.id) } returns true
-                coEvery { mockPublisher.publish(doc.id) } returns Unit
+                coEvery { mockPublisher.publish(doc.id, any()) } returns Unit
 
                 val response = client.post("/api/documents/${doc.id}/retry")
                 response.status shouldBe HttpStatusCode.OK
@@ -654,12 +661,12 @@ class DocumentRoutesTest : FunSpec({
                 val resetDoc = doc.copy(classification = "unclassified", confidence = null)
                 coEvery { mockRepo.getById(doc.id) } returnsMany listOf(doc, resetDoc)
                 coEvery { mockRepo.resetClassification(doc.id) } returns true
-                coEvery { mockPublisher.publish(doc.id) } returns Unit
+                coEvery { mockPublisher.publish(doc.id, any()) } returns Unit
 
                 client.post("/api/documents/${doc.id}/retry")
 
                 coVerify { mockRepo.resetClassification(doc.id) }
-                coVerify { mockPublisher.publish(doc.id) }
+                coVerify { mockPublisher.publish(doc.id, any()) }
             }
         }
 
@@ -672,7 +679,7 @@ class DocumentRoutesTest : FunSpec({
                 coEvery { mockRepo.getById(doc.id) } returnsMany listOf(doc, resetDoc)
                 coEvery { mockStorage.delete("2024/07/15/ocr.json") } returns true
                 coEvery { mockRepo.resetClassification(doc.id) } returns true
-                coEvery { mockPublisher.publish(doc.id) } returns Unit
+                coEvery { mockPublisher.publish(doc.id, any()) } returns Unit
 
                 client.post("/api/documents/${doc.id}/retry")
 
@@ -715,7 +722,7 @@ class DocumentRoutesTest : FunSpec({
                         storedDocs[doc.id] = doc
                         doc
                     }
-                    coEvery { mockPublisher.publish(any()) } returns Unit
+                    coEvery { mockPublisher.publish(any(), any()) } returns Unit
                     coEvery { mockRepo.getById(any()) } answers {
                         storedDocs[firstArg()]
                     }
@@ -767,7 +774,7 @@ class DocumentRoutesTest : FunSpec({
                     }
 
                     coEvery { mockRepo.insert(capture(capturedDoc)) } answers { capturedDoc.captured }
-                    coEvery { mockPublisher.publish(any()) } returns Unit
+                    coEvery { mockPublisher.publish(any(), any()) } returns Unit
 
                     client.post("/api/documents/upload") {
                         setBody(MultiPartFormDataContent(formData {
@@ -916,7 +923,7 @@ class DocumentRoutesTest : FunSpec({
                 // First getById returns doc, second (after reset) returns null
                 coEvery { mockRepo.getById(doc.id) } returnsMany listOf(doc, null)
                 coEvery { mockRepo.resetClassification(doc.id) } returns true
-                coEvery { mockPublisher.publish(doc.id) } returns Unit
+                coEvery { mockPublisher.publish(doc.id, any()) } returns Unit
 
                 val response = client.post("/api/documents/${doc.id}/retry")
                 response.status shouldBe HttpStatusCode.NotFound
@@ -931,7 +938,7 @@ class DocumentRoutesTest : FunSpec({
                 val resetDoc = doc.copy(classification = "unclassified", confidence = null)
                 coEvery { mockRepo.getById(doc.id) } returnsMany listOf(doc, resetDoc)
                 coEvery { mockRepo.resetClassification(doc.id) } returns false
-                coEvery { mockPublisher.publish(doc.id) } returns Unit
+                coEvery { mockPublisher.publish(doc.id, any()) } returns Unit
 
                 val response = client.post("/api/documents/${doc.id}/retry")
                 // Should still return 200 (resetClassification returning false doesn't abort)
@@ -948,7 +955,7 @@ class DocumentRoutesTest : FunSpec({
                 coEvery { mockRepo.getById(doc.id) } returnsMany listOf(doc, resetDoc)
                 coEvery { mockStorage.delete("2024/07/15/ocr.json") } throws RuntimeException("Storage error")
                 coEvery { mockRepo.resetClassification(doc.id) } returns true
-                coEvery { mockPublisher.publish(doc.id) } returns Unit
+                coEvery { mockPublisher.publish(doc.id, any()) } returns Unit
 
                 val response = client.post("/api/documents/${doc.id}/retry")
                 // Should still succeed — OCR deletion failure is caught

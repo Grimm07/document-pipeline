@@ -1,6 +1,7 @@
 package org.example.pipeline.worker.di
 
 import io.ktor.server.config.*
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
 import org.example.pipeline.db.ExposedDocumentRepository
 import org.example.pipeline.domain.ClassificationService
 import org.example.pipeline.domain.DocumentRepository
@@ -16,9 +17,10 @@ import java.nio.file.Paths
  * Creates the Koin module for worker dependencies.
  *
  * @param config Application configuration
+ * @param meterRegistry Optional Prometheus registry for ML call timing
  * @return Koin module with all worker dependencies
  */
-fun workerModule(config: HoconApplicationConfig) = module {
+fun workerModule(config: HoconApplicationConfig, meterRegistry: PrometheusMeterRegistry? = null) = module {
 
     // Repository
     single<DocumentRepository> {
@@ -35,7 +37,8 @@ fun workerModule(config: HoconApplicationConfig) = module {
     single<ClassificationService> {
         val mlServiceUrl = config.property("mlService.baseUrl").getString()
         val timeoutMs = config.property("mlService.timeoutMs").getString().toLong()
-        HttpClassificationService(mlServiceUrl, timeoutMs)
+        val mlCallTimer = meterRegistry?.timer("ml_service_call_duration_seconds")
+        HttpClassificationService(mlServiceUrl, timeoutMs, mlCallTimer)
     } onClose { service ->
         (service as? HttpClassificationService)?.close()
     }

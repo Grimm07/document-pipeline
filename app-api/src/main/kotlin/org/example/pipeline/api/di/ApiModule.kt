@@ -1,6 +1,8 @@
 package org.example.pipeline.api.di
 
 import com.typesafe.config.ConfigFactory
+import io.micrometer.prometheusmetrics.PrometheusConfig
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
 import io.ktor.server.config.*
 import org.example.pipeline.db.DatabaseConfig
 import org.example.pipeline.db.ExposedDocumentRepository
@@ -33,6 +35,9 @@ val apiModule = module {
     single {
         HoconApplicationConfig(ConfigFactory.load())
     }
+
+    // Metrics registry
+    single { PrometheusMeterRegistry(PrometheusConfig.DEFAULT) }
 
     // Database
     single {

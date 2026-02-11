@@ -194,3 +194,25 @@ class TestClassifyWithOcrEndpoint:
         )
         data = response.json()
         assert set(data.keys()) == {"classification", "confidence", "ocr"}
+
+
+def test_metrics_endpoint(loaded_client):
+    """GET /metrics returns Prometheus metrics text."""
+    response = loaded_client.get("/metrics")
+    assert response.status_code == 200
+    assert "http_request" in response.text or "HELP" in response.text
+
+
+def test_correlation_id_echoed(loaded_client):
+    """X-Request-ID header is echoed back in response."""
+    response = loaded_client.get("/health", headers={"X-Request-ID": "test-corr-123"})
+    assert response.status_code == 200
+    assert response.headers.get("X-Request-ID") == "test-corr-123"
+
+
+def test_correlation_id_generated(loaded_client):
+    """X-Request-ID header is generated when not provided."""
+    response = loaded_client.get("/health")
+    assert response.status_code == 200
+    assert "X-Request-ID" in response.headers
+    assert len(response.headers["X-Request-ID"]) > 0

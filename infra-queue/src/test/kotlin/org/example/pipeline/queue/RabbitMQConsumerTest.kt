@@ -57,7 +57,7 @@ class RabbitMQConsumerTest : FunSpec({
         test("consumer declares same topology as publisher") {
             // Create a consumer — its start() should declare topology
             val received = CompletableDeferred<String>()
-            val consumer = RabbitMQConsumer(connection) { docId -> received.complete(docId) }
+            val consumer = RabbitMQConsumer(connection) { docId, _ -> received.complete(docId) }
             consumer.start()
 
             val ch = connection.createChannel()
@@ -74,7 +74,7 @@ class RabbitMQConsumerTest : FunSpec({
     context("consume") {
         test("receives published message and passes documentId to handler") {
             val received = CompletableDeferred<String>()
-            val consumer = RabbitMQConsumer(connection) { docId -> received.complete(docId) }
+            val consumer = RabbitMQConsumer(connection) { docId, _ -> received.complete(docId) }
             consumer.start()
 
             val docId = UUID.randomUUID().toString()
@@ -91,7 +91,7 @@ class RabbitMQConsumerTest : FunSpec({
             val received = CopyOnWriteArrayList<String>()
             val allDone = CompletableDeferred<Unit>()
 
-            val consumer = RabbitMQConsumer(connection) { docId ->
+            val consumer = RabbitMQConsumer(connection) { docId, _ ->
                 received.add(docId)
                 if (received.size == ids.size) allDone.complete(Unit)
             }
@@ -126,7 +126,7 @@ class RabbitMQConsumerTest : FunSpec({
             val validId = UUID.randomUUID().toString()
             val received = CompletableDeferred<String>()
 
-            val consumer = RabbitMQConsumer(connection) { docId ->
+            val consumer = RabbitMQConsumer(connection) { docId, _ ->
                 received.complete(docId)
             }
             consumer.start()
@@ -145,7 +145,7 @@ class RabbitMQConsumerTest : FunSpec({
             val received = CompletableDeferred<String>()
             val attempts = java.util.concurrent.atomic.AtomicInteger(0)
 
-            val consumer = RabbitMQConsumer(connection) { id ->
+            val consumer = RabbitMQConsumer(connection) { id, _ ->
                 if (attempts.incrementAndGet() == 1) {
                     throw RuntimeException("Transient failure")
                 }
@@ -167,7 +167,7 @@ class RabbitMQConsumerTest : FunSpec({
             val successId = UUID.randomUUID().toString()
             val received = CompletableDeferred<String>()
 
-            val consumer = RabbitMQConsumer(connection) { docId ->
+            val consumer = RabbitMQConsumer(connection) { docId, _ ->
                 if (docId == errorId) {
                     throw RuntimeException("Permanent failure")
                 }
@@ -188,7 +188,7 @@ class RabbitMQConsumerTest : FunSpec({
     context("stop") {
         test("stops consuming after stop is called") {
             val received = CopyOnWriteArrayList<String>()
-            val consumer = RabbitMQConsumer(connection) { docId ->
+            val consumer = RabbitMQConsumer(connection) { docId, _ ->
                 received.add(docId)
             }
             consumer.start()
@@ -209,7 +209,7 @@ class RabbitMQConsumerTest : FunSpec({
             val received = CopyOnWriteArrayList<String>()
             val firstReceived = CompletableDeferred<Unit>()
 
-            val consumer = RabbitMQConsumer(connection) { docId ->
+            val consumer = RabbitMQConsumer(connection) { docId, _ ->
                 received.add(docId)
                 if (received.size == 1) firstReceived.complete(Unit)
             }

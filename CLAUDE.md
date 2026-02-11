@@ -12,7 +12,7 @@
 
 Document Pipeline — a multi-module Kotlin document ingestion service. Accepts document uploads (PDF, images, text) via REST API, stores files locally, persists metadata in PostgreSQL, and dispatches async classification jobs through RabbitMQ to a worker that calls an external ML service.
 
-**Current state**: All business logic implemented, security-hardened (Pass 1), document viewers + OCR pipeline complete (Pass 2), test coverage expanded (Pass 3), linting + documentation enforced (Pass 4). Frontend SPA in `frontend/` with rich viewers (JSON/XML/PDF deep zoom) and OCR results display (tabbed viewer with bounding box overlays). ML service has `/classify-with-ocr` endpoint with PaddleOCR bounding box detection. All tests pass (`./gradlew test` and `cd frontend && npm test`). All linters pass (`./gradlew detekt`, `ruff check`, `eslint`). Run `grep -rn "TODO()" --include="*.kt" .` to verify no stubs remain.
+**Current state**: All business logic implemented, security-hardened (Pass 1), document viewers + OCR pipeline complete (Pass 2), test coverage expanded (Pass 3), linting + documentation enforced (Pass 4), Gradle config cache + DevEx (Pass 5), observability + structured logging (Pass 6). Frontend SPA in `frontend/` with rich viewers (JSON/XML/PDF deep zoom) and OCR results display (tabbed viewer with bounding box overlays). ML service has `/classify-with-ocr` endpoint with PaddleOCR bounding box detection. All three services expose Prometheus `/metrics` endpoints; correlation IDs propagate API → RabbitMQ → Worker → ML via `X-Request-ID`. All tests pass (`./gradlew test` and `cd frontend && npm test`). All linters pass (`./gradlew detekt`, `ruff check`, `eslint`). Run `grep -rn "TODO()" --include="*.kt" .` to verify no stubs remain.
 
 ## Build & Run Commands
 
@@ -140,6 +140,7 @@ cog check
 **Quick start**: `docker compose -f docker/docker-compose.yml up -d && ./gradlew build`
 **Frontend quick start**: `cd frontend && npm install && npm run dev` (requires backend at localhost:8080)
 **Verify services**: `curl localhost:8080/api/documents` (API), `curl localhost:8000/health` (ML service), `curl localhost:15672` (RabbitMQ management UI, guest/guest)
+**Verify observability**: `curl localhost:8080/metrics` (API metrics), `curl localhost:8081/metrics` (Worker metrics), `curl localhost:8000/metrics` (ML metrics), `curl localhost:9090/api/v1/targets` (Prometheus targets), `curl localhost:3000/api/health` (Grafana)
 
 ## Architecture
 
@@ -174,6 +175,9 @@ ml-service/ ────── (Python FastAPI, pip-managed) ◀── app-worke
 - **Flyway migrations**: SQL files in `infra-db/src/main/resources/db/migration/` following `V{N}__description.sql` naming. Run automatically on startup.
 - **ML HTTP contracts**: `POST /classify-with-ocr` — `{"content": "<b64>", "mimeType": "..."}` → `{"classification", "confidence", "ocr": {"pages", "fullText"}}`. Legacy `POST /classify` still available (no OCR).
 - **ML env vars**: `ML_CLASSIFIER_MODEL`, `ML_OCR_MODEL`, `ML_CANDIDATE_LABELS`, `ML_DEVICE` (`cuda`/`cpu`), `ML_TORCH_DTYPE`, `ML_OCR_MAX_PDF_PAGES`, `ML_HF_HOME`
+- **Correlation ID propagation**: API generates UUID via Ktor `CallId` plugin → stored in `DocumentMessage.correlationId` field → Worker extracts and sets `MDC("correlationId")` → forwarded as `X-Request-ID` header to ML service → ML stores in `ContextVar` via ASGI middleware. All JSON logs include `correlationId`.
+- **Prometheus metrics**: API at `/metrics` (Micrometer+Ktor), Worker at port 8081 `/metrics` (JDK HttpServer), ML at `/metrics` (prometheus-fastapi-instrumentator). Grafana dashboards auto-provisioned.
+- **Structured JSON logging**: LogstashEncoder (Kotlin) and python-json-logger (Python). Dev mode uses plain text (`-Dlogback.configurationFile=logback-text.xml` in `dev.sh`).
 
 ### Two Runnable Applications
 
@@ -198,18 +202,20 @@ Note the DI asymmetry: API module is a top-level `val`; worker module is a funct
 
 ## Tech Stack
 
-**Backend**: Kotlin 2.2, JVM 21, Gradle version catalog (`gradle/libs.versions.toml`), Ktor 3.2 (Netty API / CIO worker client), kotlinx.serialization, kotlinx.datetime, Koin DI, Exposed DSL, Flyway, HikariCP, RabbitMQ, Detekt 1.23.8
+**Backend**: Kotlin 2.2, JVM 21, Gradle version catalog (`gradle/libs.versions.toml`), Ktor 3.2 (Netty API / CIO worker client), kotlinx.serialization, kotlinx.datetime, Koin DI, Exposed DSL, Flyway, HikariCP, RabbitMQ, Micrometer 1.14 + Prometheus, LogstashEncoder (JSON logging), Detekt 1.23.8
 **Frontend**: React 19, TypeScript 5, Vite 6, TanStack Router + Query + Form, Tailwind CSS v4, shadcn/ui, pdfjs-dist + openseadragon, ESLint 9 + Prettier 3
-**ML Service**: Python 3.12, FastAPI, Transformers (DeBERTa-v3-large NLI), GOT-OCR2, PaddleOCR, PyMuPDF, Ruff
+**ML Service**: Python 3.12, FastAPI, Transformers (DeBERTa-v3-large NLI), GOT-OCR2, PaddleOCR, PyMuPDF, prometheus-client + prometheus-fastapi-instrumentator, python-json-logger, Ruff
 **Testing**: Kotest 6 (FunSpec) + JUnit 5 + Testcontainers + MockK (backend), Vitest + RTL + MSW + Playwright (frontend), pytest (ML)
-**Infrastructure**: PostgreSQL 16, RabbitMQ 4, Docker Compose, NVIDIA CUDA 12.6 (optional), git-cliff (changelog), Lefthook, Cocogitto (commit linting)
+**Infrastructure**: PostgreSQL 16, RabbitMQ 4, Docker Compose, Prometheus + Grafana, NVIDIA CUDA 12.6 (optional), git-cliff (changelog), Lefthook, Cocogitto (commit linting)
 
 **Test file convention**: `<module>/src/test/kotlin/org/example/pipeline/<package>/<ClassName>Test.kt`. Stress tests use `<ClassName>StressTest.kt` suffix in the same directory.
 **ML service test convention**: `ml-service/tests/test_<module>.py`. GPU integration tests in `test_gpu_integration.py` are marked `@pytest.mark.gpu` and excluded by default (`addopts = "-m 'not gpu'"` in pyproject.toml). Run with `pytest -m gpu -v`. Module-scoped fixtures for loaded models avoid reloading between tests.
 
 ## Configuration
 
-Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `RABBITMQ_HOST`, `RABBITMQ_PORT`, `STORAGE_BASE_DIR`, `ML_SERVICE_URL`. Defaults point to localhost for local dev with Docker.
+Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `RABBITMQ_HOST`, `RABBITMQ_PORT`, `STORAGE_BASE_DIR`, `ML_SERVICE_URL`, `WORKER_METRICS_PORT`. Defaults point to localhost for local dev with Docker.
+
+**Service ports**: API 8080 (`/api/*`, `/metrics`, `/health`), Worker metrics 8081 (`/metrics`), ML service 8000 (`/health`, `/metrics`, `/classify-with-ocr`), PostgreSQL 5432, RabbitMQ 5672 (AMQP) / 15672 (management) / 15692 (Prometheus), Prometheus 9090, Grafana 3000.
 
 ## Git Workflow
 
@@ -240,6 +246,12 @@ Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATA
 - **Detekt runs with `./gradlew build`** — it hooks into the `check` task. Add `@Suppress("RuleName")` for justified exceptions. Wildcard imports for Exposed, Ktor, RabbitMQ, Kotest, MockK are pre-exempted in config.
 - **KDoc on public APIs is enforced** — Detekt's `UndocumentedPublicClass/Function/Property` rules are active (test files excluded). Add KDoc when creating new public APIs.
 - **Detekt companion objects** — use `private companion object` for constants to avoid `UndocumentedPublicClass` on companion. If public, add KDoc to the companion.
+- **Micrometer 1.14+ package rename** — use `io.micrometer.prometheusmetrics.PrometheusMeterRegistry` and `PrometheusConfig`, NOT the old `io.micrometer.prometheus` package (won't compile).
+- **MDC is thread-local, coroutines switch threads** — Ktor `CallLogging` plugin handles MDC per-request automatically. Worker uses `runBlocking` (same thread), so MDC is safe there. Do NOT use MDC in `suspend` functions launched with `Dispatchers.IO` without explicit MDC context propagation.
+- **Worker metrics port** — configurable via `WORKER_METRICS_PORT` env var (default 8081). Uses JDK `com.sun.net.httpserver.HttpServer` — zero extra dependencies.
+- **`host.docker.internal` on Linux** — requires `extra_hosts: ["host.docker.internal:host-gateway"]` in docker-compose (Docker 20.10+). Prometheus scrapes host-running API/Worker via this.
+- **Old queue messages without `correlationId`** — backward compatible. Field defaults to `null`, consumer's Json uses `ignoreUnknownKeys = true`.
+- **LogstashEncoder brings jackson-databind transitively** — no conflict with kotlinx.serialization (independent serialization systems).
 
 ### Database / Infrastructure
 
