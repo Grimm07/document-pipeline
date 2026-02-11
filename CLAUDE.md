@@ -187,6 +187,12 @@ Note the DI asymmetry: API module is a top-level `val`; worker module is a funct
 
 Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `RABBITMQ_HOST`, `RABBITMQ_PORT`, `STORAGE_BASE_DIR`, `ML_SERVICE_URL`. Defaults point to localhost for local dev with Docker.
 
+## Git Workflow
+
+- **Remote**: `git@github.com:Grimm07/document-pipeline.git` (origin)
+- **Branch**: `main` — all work currently on main (no feature branch convention yet)
+- **Commit style**: imperative subject line, bullet-point body for multi-topic commits
+
 ## Gotchas
 
 ### Kotlin / Gradle
@@ -207,6 +213,7 @@ Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATA
 
 ### Database / Infrastructure
 
+- **Never document credential defaults in README or public docs** — they exist in `application.conf` and `docker-compose.yml` for local dev, but don't repeat values like passwords in documentation.
 - **Never edit existing Flyway migrations** — create `V{N+1}__` instead. Applied migrations are immutable.
 - **Start Docker before running apps** — `docker compose -f docker/docker-compose.yml up -d` must run first.
 - **RabbitMQ topology** — publisher and consumer must declare identical topology via `declareTopology()`.
@@ -244,9 +251,9 @@ Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATA
 - **SIGBUS can't be caught** — use subprocess probe to detect if `from transformers import pipeline` works.
 - **Mocking uninstalled lazy imports** — inject mock into `sys.modules["paddleocr"]` before `load()`, not `@patch()` (fails with `ModuleNotFoundError`).
 
-## TODO — Remaining Hardening Passes
+## Roadmap (Passes 3–9)
 
-Pass 1 (Security & Robustness) and Pass 2 (Document Viewers + OCR Pipeline) are complete. Three passes remain:
+Passes 1–2 (security hardening, document viewers + OCR) are complete. Remaining:
 
 ### Pass 3: Test Coverage Gaps
 - Frontend E2E tests need Playwright browsers installed (`npx playwright install chromium`) and backend running
@@ -264,8 +271,27 @@ Pass 1 (Security & Robustness) and Pass 2 (Document Viewers + OCR Pipeline) are 
 ### Pass 5: Build & DevEx Optimization
 - Gradle configuration cache enablement (currently disabled due to past corruption)
 - Docker Compose health checks for test reliability
-- CI pipeline configuration (GitHub Actions or similar)
 - Test parallelization tuning for Testcontainers (shared containers across specs)
+
+### Pass 6: Observability & Logging
+- Model observability: inference latency, throughput, GPU memory, Prometheus `/metrics` on ML service
+- Structured JSON logging across all services with correlation IDs (upload → queue → worker → ML)
+- Audit trail for document lifecycle events
+
+### Pass 7: Model Explainability
+- Per-label confidence scores (not just top-1) in classification results
+- Attention/token attribution for classification decisions
+- Frontend visualization of confidence distribution across candidate labels
+
+### Pass 8: CI/CD
+- GitHub Actions CI: backend tests (service containers for Postgres/RabbitMQ), frontend type-check + Vitest + build, ML pytest
+- CD pipeline: Docker image builds for app-api, app-worker, ml-service, frontend; push to GHCR; tagged releases
+
+### Pass 9: Log Ingestion & Analytics (Go)
+- New standalone Go service: ingest, parse, store, and visualize logs from all pipeline components
+- Sources: app-api, app-worker, ml-service, PostgreSQL, RabbitMQ logs
+- Dashboard with real-time log stream, per-service health, correlation ID trace view
+- Depends on Pass 6 (structured logging) landing first
 
 ## Automations
 

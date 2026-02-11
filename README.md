@@ -75,7 +75,7 @@ cd frontend && npm install && npm run dev
 ```bash
 curl localhost:8080/api/documents        # API
 curl localhost:8000/health               # ML service
-curl localhost:15672                      # RabbitMQ management (guest/guest)
+curl localhost:15672                      # RabbitMQ management UI
 ```
 
 ## Module Structure
@@ -163,19 +163,33 @@ cd ml-service && pytest -m gpu -v
 
 ## Configuration
 
-Both apps use HOCON (`application.conf`) with environment variable overrides:
+Both apps use HOCON (`application.conf`) with environment variable overrides. Local dev defaults are baked into Docker Compose and `application.conf` — **override all credentials for production**.
 
-| Variable | Description | Default |
+| Variable | Description | Dev default |
 |---|---|---|
-| `DATABASE_URL` | PostgreSQL JDBC URL | `jdbc:postgresql://localhost:5432/document_pipeline` |
-| `DATABASE_USERNAME` | Database user | `pipeline` |
-| `DATABASE_PASSWORD` | Database password | `pipeline_secret` |
+| `DATABASE_URL` | PostgreSQL JDBC URL | `localhost:5432/document_pipeline` |
+| `DATABASE_USERNAME` | Database user | Set in `application.conf` |
+| `DATABASE_PASSWORD` | Database password | Set in `application.conf` |
 | `RABBITMQ_HOST` | RabbitMQ host | `localhost` |
 | `RABBITMQ_PORT` | RabbitMQ port | `5672` |
 | `STORAGE_BASE_DIR` | File storage directory | `./document-storage` |
 | `ML_SERVICE_URL` | ML classification service URL | `http://localhost:8000` |
 
 ML service uses `ML_`-prefixed env vars: `ML_DEVICE`, `ML_TORCH_DTYPE`, `ML_HF_HOME`, `ML_CANDIDATE_LABELS`, `ML_OCR_MAX_PDF_PAGES`.
+
+## Roadmap
+
+Passes 1-2 (security hardening, document viewers + OCR pipeline) are complete.
+
+| Pass | Focus | Status |
+|---|---|---|
+| 3 | Test coverage gaps (E2E, integration, error paths) | Planned |
+| 4 | Documentation & code quality (KDoc, error consistency) | Planned |
+| 5 | Build & DevEx (Gradle config cache, Docker health checks) | Planned |
+| 6 | Observability & logging (Prometheus metrics, correlation IDs) | Planned |
+| 7 | Model explainability (per-label scores, attention attribution) | Planned |
+| 8 | CI/CD (GitHub Actions, Docker image builds, GHCR) | Planned |
+| 9 | Log ingestion & analytics — new Go service with dashboard | Planned |
 
 ## License
 
