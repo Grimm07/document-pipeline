@@ -73,9 +73,10 @@ cd frontend && npm install && npm run dev
 ### Verify
 
 ```bash
-curl localhost:8080/api/documents        # API
-curl localhost:8000/health               # ML service
-curl localhost:15672                      # RabbitMQ management UI
+curl localhost:8080/api/health              # API health check
+curl localhost:8080/api/documents           # API document list
+curl localhost:8000/health                  # ML service
+curl localhost:15672                        # RabbitMQ management UI
 ```
 
 ## Module Structure
@@ -106,6 +107,7 @@ curl localhost:15672                      # RabbitMQ management UI
 | `GET` | `/api/documents/{id}/ocr` | Get OCR results JSON (bounding boxes + full text) |
 | `DELETE` | `/api/documents/{id}` | Delete document and associated files |
 | `POST` | `/api/documents/{id}/retry` | Re-queue document for classification |
+| `GET` | `/api/health` | Liveness probe — returns `{"status":"ok"}` |
 
 ## Frontend
 
@@ -134,7 +136,7 @@ For CPU-only mode, set `ML_DEVICE=cpu` and `ML_TORCH_DTYPE=float32` in the envir
 
 ## Tech Stack
 
-**Backend** — Kotlin 2.2, JVM 21, Gradle (Kotlin DSL) with version catalog, Ktor 3.2 (Netty), kotlinx.serialization, Koin DI, Exposed DSL, Flyway, HikariCP, RabbitMQ (amqp-client), Kotlin Coroutines, SLF4J + Logback, HOCON config, **Detekt** (linting)
+**Backend** — Kotlin 2.2, JVM 21, Gradle (Kotlin DSL) with version catalog + buildSrc convention plugin + configuration cache, Ktor 3.2 (Netty), kotlinx.serialization, Koin DI, Exposed DSL, Flyway, HikariCP, RabbitMQ (amqp-client), Kotlin Coroutines, SLF4J + Logback, HOCON config, **Detekt** (linting)
 
 **Frontend** — React 19, TypeScript 5, Vite 6, TanStack Router + Query + Form, Tailwind CSS v4, shadcn/ui, pdfjs-dist, openseadragon, Vitest + React Testing Library + MSW, Playwright, **ESLint 9** + **Prettier** (linting/formatting)
 
@@ -210,7 +212,7 @@ ML service uses `ML_`-prefixed env vars: `ML_DEVICE`, `ML_TORCH_DTYPE`, `ML_HF_H
 | 2 | Document viewers + OCR pipeline | Done |
 | 3 | Test coverage gaps (E2E, integration, error paths) | Done |
 | 4 | Documentation & code quality (Detekt, Ruff, ESLint, KDoc, docstrings, JSDoc) | Done |
-| 5 | Build & DevEx (Gradle config cache, Docker health checks) | Planned |
+| 5 | Build & DevEx (Gradle config cache, Docker health checks) | Done |
 | 6 | Observability & logging (Prometheus metrics, correlation IDs) | Planned |
 | 7 | Model explainability (per-label scores, attention attribution) | Planned |
 | 8 | CI/CD (GitHub Actions, Docker image builds, GHCR) | Planned |
