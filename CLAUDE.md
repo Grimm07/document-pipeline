@@ -12,7 +12,7 @@
 
 Document Pipeline — a multi-module Kotlin document ingestion service. Accepts document uploads (PDF, images, text) via REST API, stores files locally, persists metadata in PostgreSQL, and dispatches async classification jobs through RabbitMQ to a worker that calls an external ML service.
 
-**Current state**: All business logic implemented, security-hardened (Pass 1), document viewers + OCR pipeline complete (Pass 2), test coverage expanded (Pass 3), linting + documentation enforced (Pass 4), Gradle config cache + DevEx (Pass 5), observability + structured logging (Pass 6). Frontend SPA in `frontend/` with rich viewers (JSON/XML/PDF deep zoom) and OCR results display (tabbed viewer with bounding box overlays). ML service has `/classify-with-ocr` endpoint with PaddleOCR bounding box detection. All three services expose Prometheus `/metrics` endpoints; correlation IDs propagate API → RabbitMQ → Worker → ML via `X-Request-ID`. All tests pass (`./gradlew test` and `cd frontend && npm test`). All linters pass (`./gradlew detekt`, `ruff check`, `eslint`). Run `grep -rn "TODO()" --include="*.kt" .` to verify no stubs remain.
+**Current state**: All business logic implemented, security-hardened (Pass 1), document viewers + OCR pipeline complete (Pass 2), test coverage expanded (Pass 3), linting + documentation enforced (Pass 4), Gradle config cache + DevEx (Pass 5), observability + structured logging (Pass 6), model explainability + label correction (Pass 7). Frontend SPA in `frontend/` with rich viewers (JSON/XML/PDF deep zoom), OCR results display (tabbed viewer with bounding box overlays), and inline label correction (popover with all candidate scores + confirmation dialog). ML service returns full label scores from zero-shot classification. DB tracks `label_scores JSONB`, `classification_source` ("ml"/"manual"), and `corrected_at` for future fine-tuning. All three services expose Prometheus `/metrics` endpoints; correlation IDs propagate API → RabbitMQ → Worker → ML via `X-Request-ID`. All tests pass (`./gradlew test` and `cd frontend && npm test`). All linters pass (`./gradlew detekt`, `ruff check`, `eslint`). Run `grep -rn "TODO()" --include="*.kt" .` to verify no stubs remain.
 
 ## Build & Run Commands
 
@@ -172,7 +172,8 @@ ml-service/ ────── (Python FastAPI, pip-managed) ◀── app-worke
 - **File storage paths**: Date-based layout `{yyyy}/{MM}/{dd}/{uuid}.{ext}` under configurable base directory.
 - **Ktor route ordering**: Search and OCR routes must be declared before `{id}` route (Ktor matches first).
 - **OCR results pipeline**: Worker calls ML `/classify-with-ocr` → stores OCR JSON as `{documentId}-ocr/ocr-results.json` → API serves at `/{id}/ocr`.
-- **Flyway migrations**: SQL files in `infra-db/src/main/resources/db/migration/` following `V{N}__description.sql` naming. Run automatically on startup.
+- **Flyway migrations**: SQL files in `infra-db/src/main/resources/db/migration/` following `V{N}__description.sql` naming. Run automatically on startup. Current: V1 (initial), V2 (OCR path), V3 (label scores + classification source).
+- **Label correction flow**: `PATCH /api/documents/{id}/classification` → `correctClassification(id, label)` → sets `classification_source = "manual"`, `corrected_at = now`. Frontend: `LabelCorrectionPopover` (Popover + AlertDialog) → `useLabelCorrection` hook → cache invalidation.
 - **ML HTTP contracts**: `POST /classify-with-ocr` — `{"content": "<b64>", "mimeType": "..."}` → `{"classification", "confidence", "ocr": {"pages", "fullText"}}`. Legacy `POST /classify` still available (no OCR).
 - **ML env vars**: `ML_CLASSIFIER_MODEL`, `ML_OCR_MODEL`, `ML_CANDIDATE_LABELS`, `ML_DEVICE` (`cuda`/`cpu`), `ML_TORCH_DTYPE`, `ML_OCR_MAX_PDF_PAGES`, `ML_HF_HOME`
 - **Correlation ID propagation**: API generates UUID via Ktor `CallId` plugin → stored in `DocumentMessage.correlationId` field → Worker extracts and sets `MDC("correlationId")` → forwarded as `X-Request-ID` header to ML service → ML stores in `ContextVar` via ASGI middleware. All JSON logs include `correlationId`.
@@ -193,6 +194,7 @@ Note the DI asymmetry: API module is a top-level `val`; worker module is a funct
 - **Glassmorphism theme** with dark/light mode via `ThemeProvider`
 - **Document viewers**: JSON (`react-json-view-lite`), XML (`react-xml-viewer`), PDF deep zoom (`pdfjs-dist` + `openseadragon`), OCR tabbed viewer with bounding box overlays
 - **Multi-select + bulk delete**: `useSelectionMode` + `useBulkDelete` hooks (`Promise.allSettled` with per-result cache eviction)
+- **Label correction UI**: `LabelCorrectionPopover` wraps `ClassificationBadge` with a `Popover` listing all candidate label scores + `AlertDialog` for confirmation. Uses `useRef` to protect selected label from Radix `onOpenChange` race. `Button` (not `AlertDialogAction`) for confirm to prevent auto-close before mutation.
 - Dev proxy: Vite forwards `/api/*` to `localhost:8080` — no CORS needed in dev
 
 ### ML Service Notes
@@ -270,7 +272,9 @@ Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATA
 - **Async preview tests** — initial render shows "Loading preview...". Use `findBy*` or test loading state.
 - **Vitest 3.x `vi.fn` generics** — use `vi.fn<(arg: T) => R>()` (single function type). Two-param form removed.
 - **`Promise.allSettled` in TanStack Query** — `onSuccess` always fires. Must inspect per-result `status` for failures.
-- **Radix AlertDialog + async** — use controlled `open`/`onOpenChange` state for dialogs triggering mutations; uncontrolled won't close if page stays mounted.
+- **Radix AlertDialog + async** — use controlled `open`/`onOpenChange` state for dialogs triggering mutations; uncontrolled won't close if page stays mounted. `AlertDialogAction` auto-closes the dialog *before* async `onClick` completes — use a regular `Button` for confirm actions that trigger mutations. Pair with `useRef` to protect selected state from `onOpenChange` race.
+- **Hook tests with MSW + relative URLs** — `renderHook` in jsdom has no browser `location`, so `fetch("/api/...")` throws "Failed to parse URL". Use `vi.mock` on the API module instead of MSW for isolated hook tests.
+- **`apiFetch` header merge caveat** — `{ headers: { Accept, ...init?.headers }, ...init }` — the final `...init` overwrites merged headers when `init` also has `headers`. Harmless now but will break if auth headers are added to `apiFetch`. Fix: merge headers explicitly.
 - **JSDoc required on exports** — `eslint-plugin-jsdoc` enforces `require-jsdoc` on exported functions, classes, interfaces, and type aliases. Excluded: tests, routes, `components/ui/`, generated files. Use `/** Description. */` (no `@param`/`@returns` — TypeScript types suffice).
 - **Prettier runs separately** — `npm run format:check` verifies, `npm run format` auto-fixes. Config: 100-char width, double quotes, trailing commas.
 

@@ -35,9 +35,14 @@ class ExposedDocumentRepository : DocumentRepository {
             row[fileSizeBytes] = document.fileSizeBytes
             row[classification] = document.classification
             row[confidence] = document.confidence
+            row[labelScores] = document.labelScores
+            row[classificationSource] = document.classificationSource
             row[metadata] = document.metadata
             row[uploadedBy] = document.uploadedBy
             row[ocrStoragePath] = document.ocrStoragePath
+            row[correctedAt] = document.correctedAt?.let {
+                OffsetDateTime.ofInstant(it.toJavaInstant(), ZoneOffset.UTC)
+            }
             row[createdAt] = OffsetDateTime.ofInstant(
                 document.createdAt.toJavaInstant(), ZoneOffset.UTC
             )
@@ -113,7 +118,8 @@ class ExposedDocumentRepository : DocumentRepository {
         id: String,
         classification: String,
         confidence: Float,
-        ocrStoragePath: String?
+        ocrStoragePath: String?,
+        labelScores: Map<String, Float>?
     ): Boolean = newSuspendedTransaction {
         val uuid = try {
             UUID.fromString(id)
@@ -127,10 +133,37 @@ class ExposedDocumentRepository : DocumentRepository {
         val updatedCount = DocumentsTable.update({ DocumentsTable.id eq uuid }) {
             it[DocumentsTable.classification] = classification
             it[DocumentsTable.confidence] = confidence
+            it[DocumentsTable.classificationSource] = "ml"
+            it[DocumentsTable.correctedAt] = null
             it[updatedAt] = now
             if (ocrStoragePath != null) {
                 it[DocumentsTable.ocrStoragePath] = ocrStoragePath
             }
+            if (labelScores != null) {
+                it[DocumentsTable.labelScores] = labelScores
+            }
+        }
+        updatedCount > 0
+    }
+
+    override suspend fun correctClassification(
+        id: String,
+        classification: String
+    ): Boolean = newSuspendedTransaction {
+        val uuid = try {
+            UUID.fromString(id)
+        } catch (e: IllegalArgumentException) {
+            logger.debug("Malformed UUID for correctClassification: {}", id, e)
+            return@newSuspendedTransaction false
+        }
+        val now = OffsetDateTime.ofInstant(
+            Clock.System.now().toJavaInstant(), ZoneOffset.UTC
+        )
+        val updatedCount = DocumentsTable.update({ DocumentsTable.id eq uuid }) {
+            it[DocumentsTable.classification] = classification
+            it[classificationSource] = "manual"
+            it[correctedAt] = now
+            it[updatedAt] = now
         }
         updatedCount > 0
     }
@@ -159,6 +192,9 @@ class ExposedDocumentRepository : DocumentRepository {
         val updatedCount = DocumentsTable.update({ DocumentsTable.id eq uuid }) {
             it[classification] = "unclassified"
             it[confidence] = null
+            it[labelScores] = null
+            it[classificationSource] = "ml"
+            it[correctedAt] = null
             it[ocrStoragePath] = null
             it[updatedAt] = now
         }
@@ -177,9 +213,12 @@ class ExposedDocumentRepository : DocumentRepository {
             fileSizeBytes = this[DocumentsTable.fileSizeBytes],
             classification = this[DocumentsTable.classification],
             confidence = this[DocumentsTable.confidence],
+            labelScores = this[DocumentsTable.labelScores],
+            classificationSource = this[DocumentsTable.classificationSource],
             metadata = this[DocumentsTable.metadata],
             uploadedBy = this[DocumentsTable.uploadedBy],
             ocrStoragePath = this[DocumentsTable.ocrStoragePath],
+            correctedAt = this[DocumentsTable.correctedAt]?.toInstant()?.toKotlinInstant(),
             createdAt = this[DocumentsTable.createdAt].toInstant().toKotlinInstant(),
             updatedAt = this[DocumentsTable.updatedAt].toInstant().toKotlinInstant()
         )

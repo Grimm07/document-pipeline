@@ -914,6 +914,90 @@ class DocumentRoutesTest : FunSpec({
         }
     }
 
+    context("PATCH /api/documents/{id}/classification") {
+        test("returns 200 with updated document on valid correction") {
+            testApplication {
+                setupApp()
+
+                val doc = testDocument(classification = "invoice", confidence = 0.85f)
+                val correctedDoc = doc.copy(classification = "contract", classificationSource = "manual")
+                coEvery { mockRepo.getById(doc.id) } returnsMany listOf(doc, correctedDoc)
+                coEvery { mockRepo.correctClassification(doc.id, "contract") } returns true
+
+                val response = client.patch("/api/documents/${doc.id}/classification") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"classification":"contract"}""")
+                }
+                response.status shouldBe HttpStatusCode.OK
+                response.bodyAsText() shouldContain "contract"
+                response.bodyAsText() shouldContain "manual"
+            }
+        }
+
+        test("returns 404 when document does not exist") {
+            testApplication {
+                setupApp()
+
+                val missingId = UUID.randomUUID().toString()
+                coEvery { mockRepo.getById(missingId) } returns null
+
+                val response = client.patch("/api/documents/$missingId/classification") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"classification":"invoice"}""")
+                }
+                response.status shouldBe HttpStatusCode.NotFound
+            }
+        }
+
+        test("returns 400 when classification is blank") {
+            testApplication {
+                setupApp()
+
+                val doc = testDocument()
+                coEvery { mockRepo.getById(doc.id) } returns doc
+
+                val response = client.patch("/api/documents/${doc.id}/classification") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"classification":"  "}""")
+                }
+                response.status shouldBe HttpStatusCode.BadRequest
+                response.bodyAsText() shouldContain "blank"
+            }
+        }
+
+        test("returns 400 when body is missing or malformed") {
+            testApplication {
+                setupApp()
+
+                val doc = testDocument()
+
+                val response = client.patch("/api/documents/${doc.id}/classification") {
+                    contentType(ContentType.Application.Json)
+                    setBody("{}")
+                }
+                response.status shouldBe HttpStatusCode.BadRequest
+            }
+        }
+
+        test("calls correctClassification on repository") {
+            testApplication {
+                setupApp()
+
+                val doc = testDocument(classification = "invoice", confidence = 0.9f)
+                val correctedDoc = doc.copy(classification = "report", classificationSource = "manual")
+                coEvery { mockRepo.getById(doc.id) } returnsMany listOf(doc, correctedDoc)
+                coEvery { mockRepo.correctClassification(doc.id, "report") } returns true
+
+                client.patch("/api/documents/${doc.id}/classification") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"classification":"report"}""")
+                }
+
+                coVerify { mockRepo.correctClassification(doc.id, "report") }
+            }
+        }
+    }
+
     context("retry edge cases") {
         test("returns 404 when doc disappears between reset and re-fetch") {
             testApplication {

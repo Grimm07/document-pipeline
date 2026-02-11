@@ -37,6 +37,7 @@ class HttpClassificationServiceTest : FunSpec({
     data class FakeClassifyRequest(val content: String, val mimeType: String)
 
     var responseOcrJson: String? = null
+    var responseScoresJson: String? = null
 
     beforeSpec {
         fakeServer = embeddedServer(Netty, port = port) {
@@ -56,12 +57,13 @@ class HttpClassificationServiceTest : FunSpec({
                     val request = call.receive<FakeClassifyRequest>()
                     lastReceivedContent = request.content
                     lastReceivedMimeType = request.mimeType
-                    // Build JSON response manually to include nullable ocr field
+                    // Build JSON response manually to include nullable ocr/scores fields
                     val ocrPart = if (responseOcrJson != null) responseOcrJson else "null"
-                    call.respondText(
-                        """{"classification":"$responseClassification","confidence":$responseConfidence,"ocr":$ocrPart}""",
-                        ContentType.Application.Json
-                    )
+                    val scoresPart = responseScoresJson ?: "{}"
+                    val body = """{"classification":"$responseClassification",""" +
+                        """"confidence":$responseConfidence,""" +
+                        """"scores":$scoresPart,"ocr":$ocrPart}"""
+                    call.respondText(body, ContentType.Application.Json)
                 }
             }
         }.start(wait = false)
@@ -85,6 +87,7 @@ class HttpClassificationServiceTest : FunSpec({
         shouldFail = false
         shouldReturnMalformed = false
         responseOcrJson = null
+        responseScoresJson = null
     }
 
     context("classify success") {
@@ -210,6 +213,20 @@ class HttpClassificationServiceTest : FunSpec({
 
             val expectedBase64 = Base64.getEncoder().encodeToString(content)
             lastReceivedContent shouldBe expectedBase64
+        }
+    }
+
+    context("label scores parsing") {
+        test("returns labelScores from ML service response") {
+            responseScoresJson = """{"invoice":0.85,"contract":0.10,"report":0.05}"""
+            val result = service.classify("hello".toByteArray(), "application/pdf")
+            result.labelScores shouldBe mapOf("invoice" to 0.85f, "contract" to 0.10f, "report" to 0.05f)
+        }
+
+        test("empty scores object results in empty labelScores map") {
+            responseScoresJson = "{}"
+            val result = service.classify("hello".toByteArray(), "text/plain")
+            result.labelScores shouldBe emptyMap()
         }
     }
 

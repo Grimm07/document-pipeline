@@ -77,6 +77,7 @@ class HttpClassificationService(
         return ClassificationResult(
             classification = classifyResponse.classification,
             confidence = classifyResponse.confidence,
+            labelScores = classifyResponse.scores,
             ocrResultJson = ocrJson
         )
     }
@@ -91,6 +92,7 @@ class HttpClassificationService(
     private data class ClassifyWithOcrResponse(
         val classification: String,
         val confidence: Float,
+        val scores: Map<String, Float>? = null,
         val ocr: JsonElement? = null
     )
 

@@ -6,11 +6,19 @@ export interface DocumentResponse {
   fileSizeBytes: number;
   classification: string;
   confidence: number | null;
+  labelScores: Record<string, number> | null;
+  classificationSource: string;
   metadata: Record<string, string>;
   uploadedBy: string | null;
   hasOcrResults: boolean;
+  correctedAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Request body for manually correcting a document's classification. */
+export interface CorrectClassificationRequest {
+  classification: string;
 }
 
 /** Mirrors backend DocumentListResponse DTO */

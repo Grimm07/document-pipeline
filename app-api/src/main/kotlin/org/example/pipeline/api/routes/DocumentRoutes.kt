@@ -160,6 +160,52 @@ fun Application.documentRoutes() {
                 call.respondBytes(bytes, ContentType.Application.Json)
             }
 
+            patch("/{id}/classification") {
+                val idParam = call.parameters["id"]
+                    ?: return@patch call.respond(
+                        HttpStatusCode.BadRequest, ErrorResponse("Missing document ID")
+                    )
+
+                val body = try {
+                    call.receive<CorrectClassificationRequest>()
+                } catch (_: Exception) {
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        ErrorResponse("Invalid request body")
+                    )
+                    return@patch
+                }
+
+                if (body.classification.isBlank()) {
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        ErrorResponse("Classification must not be blank")
+                    )
+                    return@patch
+                }
+
+                val existing = documentRepository.getById(idParam)
+                if (existing == null) {
+                    call.respond(
+                        HttpStatusCode.NotFound,
+                        ErrorResponse("Document not found: $idParam")
+                    )
+                    return@patch
+                }
+
+                documentRepository.correctClassification(idParam, body.classification)
+
+                val updated = documentRepository.getById(idParam)
+                if (updated == null) {
+                    call.respond(
+                        HttpStatusCode.NotFound,
+                        ErrorResponse("Document not found: $idParam")
+                    )
+                    return@patch
+                }
+                call.respond(HttpStatusCode.OK, updated.toResponse())
+            }
+
             @Suppress("TooGenericExceptionCaught") // File deletion must not fail the request
             delete("/{id}") {
                 val idParam = call.parameters["id"]

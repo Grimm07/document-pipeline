@@ -3,12 +3,14 @@
 All notable changes to this project will be documented in this file.
 
 
-## [0.1.0] - 2026-02-11
+## [0.2.0] - 2026-02-11
 
 ### Features
 
 - Enable Gradle configuration cache and build cache ([8e71af0](https://github.com/Grimm07/document-pipeline/commit/8e71af08492a46d10e43430a80516ea1513accbe))
 - Add /api/health endpoint for readiness probes ([4cc3ccd](https://github.com/Grimm07/document-pipeline/commit/4cc3ccdd7b62c51982750453e43dd00e83608e7e))
+- Add commit linting with Lefthook + Cocogitto ([c58bd3b](https://github.com/Grimm07/document-pipeline/commit/c58bd3bbb8616d1ef7a92f974ba2acd70b5fd959))
+- Add observability with Prometheus metrics, correlation IDs, and structured logging ([2ab19c2](https://github.com/Grimm07/document-pipeline/commit/2ab19c28d13d3f099f2fbb9a570549ba1aaf043b))
 
 ### Other
 

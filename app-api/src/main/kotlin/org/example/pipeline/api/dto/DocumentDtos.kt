@@ -12,9 +12,12 @@ import org.example.pipeline.domain.Document
  * @property fileSizeBytes File size in bytes
  * @property classification ML-assigned classification label
  * @property confidence ML confidence score (0.0-1.0), null if not yet classified
+ * @property labelScores All candidate label scores from classification, null if not yet classified
+ * @property classificationSource Origin of current classification: "ml" or "manual"
  * @property metadata User-provided key-value metadata
  * @property uploadedBy Optional uploader identifier
  * @property hasOcrResults Whether OCR results are available for this document
+ * @property correctedAt ISO-8601 timestamp when a human corrected the classification, null if never corrected
  * @property createdAt ISO-8601 creation timestamp
  * @property updatedAt ISO-8601 last update timestamp
  */
@@ -26,9 +29,12 @@ data class DocumentResponse(
     val fileSizeBytes: Long,
     val classification: String,
     val confidence: Float?,
+    val labelScores: Map<String, Float>?,
+    val classificationSource: String,
     val metadata: Map<String, String>,
     val uploadedBy: String?,
     val hasOcrResults: Boolean,
+    val correctedAt: String?,
     val createdAt: String,
     val updatedAt: String
 )
@@ -62,6 +68,14 @@ data class DocumentListResponse(
 )
 
 /**
+ * Request DTO for manually correcting a document's classification.
+ *
+ * @property classification The corrected classification label
+ */
+@Serializable
+data class CorrectClassificationRequest(val classification: String)
+
+/**
  * Error response DTO.
  *
  * @property error Human-readable error message
@@ -85,9 +99,12 @@ fun Document.toResponse(): DocumentResponse = DocumentResponse(
     fileSizeBytes = fileSizeBytes,
     classification = classification,
     confidence = confidence,
+    labelScores = labelScores,
+    classificationSource = classificationSource,
     metadata = metadata,
     uploadedBy = uploadedBy,
     hasOcrResults = ocrStoragePath != null,
+    correctedAt = correctedAt?.toString(),
     createdAt = createdAt.toString(),
     updatedAt = updatedAt.toString()
 )

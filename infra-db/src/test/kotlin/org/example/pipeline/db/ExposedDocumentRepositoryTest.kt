@@ -306,6 +306,79 @@ class ExposedDocumentRepositoryTest : FunSpec({
             fetched.shouldNotBeNull()
             fetched.ocrStoragePath.shouldBeNull()
         }
+
+        test("stores labelScores when provided") {
+            val doc = repo.insert(testDocument())
+            val scores = mapOf("invoice" to 0.85f, "contract" to 0.10f, "report" to 0.05f)
+
+            repo.updateClassification(doc.id, "invoice", 0.85f, labelScores = scores)
+
+            val fetched = repo.getById(doc.id)
+            fetched.shouldNotBeNull()
+            fetched.labelScores shouldBe scores
+            fetched.classificationSource shouldBe "ml"
+            fetched.correctedAt.shouldBeNull()
+        }
+
+        test("leaves labelScores null when not provided") {
+            val doc = repo.insert(testDocument())
+
+            repo.updateClassification(doc.id, "invoice", 0.9f)
+
+            val fetched = repo.getById(doc.id)
+            fetched.shouldNotBeNull()
+            fetched.labelScores.shouldBeNull()
+        }
+    }
+
+    context("correctClassification") {
+        test("sets classification and marks source as manual") {
+            val doc = repo.insert(testDocument())
+            val scores = mapOf("invoice" to 0.85f, "contract" to 0.10f, "report" to 0.05f)
+            repo.updateClassification(doc.id, "invoice", 0.85f, labelScores = scores)
+
+            val corrected = repo.correctClassification(doc.id, "contract")
+            corrected.shouldBeTrue()
+
+            val fetched = repo.getById(doc.id)
+            fetched.shouldNotBeNull()
+            fetched.classification shouldBe "contract"
+            fetched.classificationSource shouldBe "manual"
+            fetched.correctedAt.shouldNotBeNull()
+        }
+
+        test("preserves existing labelScores") {
+            val doc = repo.insert(testDocument())
+            val scores = mapOf("invoice" to 0.85f, "contract" to 0.10f)
+            repo.updateClassification(doc.id, "invoice", 0.85f, labelScores = scores)
+
+            repo.correctClassification(doc.id, "contract")
+
+            val fetched = repo.getById(doc.id)
+            fetched.shouldNotBeNull()
+            fetched.labelScores shouldBe scores
+        }
+
+        test("returns false for missing document") {
+            repo.correctClassification(UUID.randomUUID().toString(), "invoice").shouldBeFalse()
+        }
+
+        test("returns false for malformed UUID") {
+            repo.correctClassification("not-a-uuid", "invoice").shouldBeFalse()
+        }
+
+        test("updates updatedAt timestamp") {
+            val doc = repo.insert(testDocument())
+            repo.updateClassification(doc.id, "invoice", 0.85f)
+            val beforeCorrection = repo.getById(doc.id)!!.updatedAt
+
+            kotlinx.coroutines.delay(50)
+            repo.correctClassification(doc.id, "contract")
+
+            val fetched = repo.getById(doc.id)
+            fetched.shouldNotBeNull()
+            fetched.updatedAt shouldNotBe beforeCorrection
+        }
     }
 
     context("persistence fidelity") {
@@ -402,6 +475,21 @@ class ExposedDocumentRepositoryTest : FunSpec({
             val fetched = repo.getById(doc.id)
             fetched.shouldNotBeNull()
             fetched.ocrStoragePath.shouldBeNull()
+        }
+
+        test("clears labelScores and resets classificationSource and correctedAt") {
+            val doc = repo.insert(testDocument())
+            val scores = mapOf("invoice" to 0.85f, "contract" to 0.10f)
+            repo.updateClassification(doc.id, "invoice", 0.85f, labelScores = scores)
+            repo.correctClassification(doc.id, "contract")
+
+            repo.resetClassification(doc.id)
+
+            val fetched = repo.getById(doc.id)
+            fetched.shouldNotBeNull()
+            fetched.labelScores.shouldBeNull()
+            fetched.classificationSource shouldBe "ml"
+            fetched.correctedAt.shouldBeNull()
         }
 
         test("updates updatedAt timestamp") {

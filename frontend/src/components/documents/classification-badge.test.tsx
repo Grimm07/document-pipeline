@@ -25,4 +25,26 @@ describe("ClassificationBadge", () => {
     const badge = screen.getByText("invoice");
     expect(badge.className).not.toContain("animate-pulse");
   });
+
+  it("shows pencil icon when classificationSource is manual", () => {
+    const { container } = render(
+      <ClassificationBadge classification="invoice" classificationSource="manual" />,
+    );
+    const svg = container.querySelector("svg");
+    expect(svg).toBeInTheDocument();
+  });
+
+  it("does not show pencil icon when classificationSource is ml", () => {
+    const { container } = render(
+      <ClassificationBadge classification="invoice" classificationSource="ml" />,
+    );
+    const svg = container.querySelector("svg");
+    expect(svg).not.toBeInTheDocument();
+  });
+
+  it("does not show pencil icon when classificationSource is not provided", () => {
+    const { container } = render(<ClassificationBadge classification="invoice" />);
+    const svg = container.querySelector("svg");
+    expect(svg).not.toBeInTheDocument();
+  });
 });

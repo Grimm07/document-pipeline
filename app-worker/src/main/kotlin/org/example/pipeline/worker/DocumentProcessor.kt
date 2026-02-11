@@ -51,7 +51,8 @@ class DocumentProcessor(
         }
 
         val updated = documentRepository.updateClassification(
-            documentId, result.classification, result.confidence, ocrStoragePath
+            documentId, result.classification, result.confidence, ocrStoragePath,
+            labelScores = result.labelScores
         )
         if (!updated) {
             logger.warn("Failed to update classification for document: {}", documentId)

@@ -30,9 +30,10 @@ def pipeline_with_bbox(mock_classifier_spec, mock_ocr_spec, mock_bbox_extractor_
 class TestDocumentPipeline:
     def test_text_mime_skips_ocr(self, pipeline, mock_ocr_spec):
         content = base64.b64encode(b"This is a test document").decode()
-        label, score = pipeline.classify_document(content, "text/plain")
+        label, score, scores = pipeline.classify_document(content, "text/plain")
         assert label == "invoice"
         assert score == 0.85
+        assert "invoice" in scores
         mock_ocr_spec.extract_text.assert_not_called()
         mock_ocr_spec.extract_text_from_images.assert_not_called()
 
@@ -69,8 +70,9 @@ class TestDocumentPipeline:
 
     def test_unknown_mime_falls_back_to_text(self, pipeline, mock_ocr_spec):
         content = base64.b64encode(b"Some content").decode()
-        label, _ = pipeline.classify_document(content, "application/octet-stream")
+        label, _, scores = pipeline.classify_document(content, "application/octet-stream")
         assert label == "invoice"
+        assert "invoice" in scores
         mock_ocr_spec.extract_text.assert_not_called()
 
     def test_empty_ocr_result_returns_unknown(self, pipeline, mock_ocr_spec, mock_classifier_spec):
@@ -83,9 +85,10 @@ class TestDocumentPipeline:
         content = base64.b64encode(buf.getvalue()).decode()
 
         mock_ocr_spec.extract_text.return_value = ""
-        label, score = pipeline.classify_document(content, "image/png")
+        label, score, scores = pipeline.classify_document(content, "image/png")
         assert label == "unknown"
         assert score == 0.0
+        assert scores == {}
         mock_classifier_spec.classify.assert_not_called()
 
     def test_mime_type_is_case_insensitive(self, pipeline, mock_ocr_spec):
@@ -97,11 +100,12 @@ class TestDocumentPipeline:
 class TestClassifyAndOcrDocument:
     def test_text_mime_returns_none_ocr(self, pipeline_with_bbox):
         content = base64.b64encode(b"Hello world").decode()
-        label, score, ocr = pipeline_with_bbox.classify_and_ocr_document(
+        label, score, scores, ocr = pipeline_with_bbox.classify_and_ocr_document(
             content, "text/plain"
         )
         assert label == "invoice"
         assert score == 0.85
+        assert "invoice" in scores
         assert ocr is None
 
     def test_image_returns_ocr_result(
@@ -116,10 +120,11 @@ class TestClassifyAndOcrDocument:
         content = base64.b64encode(buf.getvalue()).decode()
 
         mock_ocr_spec.extract_text.return_value = "OCR text from image"
-        label, score, ocr = pipeline_with_bbox.classify_and_ocr_document(
+        label, score, scores, ocr = pipeline_with_bbox.classify_and_ocr_document(
             content, "image/png"
         )
         assert label == "invoice"
+        assert "invoice" in scores
         assert ocr is not None
         assert len(ocr.pages) == 1
         assert ocr.pages[0].pageIndex == 0
@@ -142,7 +147,7 @@ class TestClassifyAndOcrDocument:
         doc.close()
 
         mock_ocr_spec.extract_text.side_effect = ["Page 1 text", "Page 2 text"]
-        label, score, ocr = pipeline_with_bbox.classify_and_ocr_document(
+        label, score, scores, ocr = pipeline_with_bbox.classify_and_ocr_document(
             pdf_bytes=None,
             content_b64=base64.b64encode(pdf_bytes).decode(),
             mime_type="application/pdf",
@@ -155,6 +160,7 @@ class TestClassifyAndOcrDocument:
         assert ocr.pages[1].text == "Page 2 text"
         assert "Page 1 text" in ocr.fullText
         assert "Page 2 text" in ocr.fullText
+        assert "invoice" in scores
 
     def test_image_empty_ocr_returns_unknown(
         self, pipeline_with_bbox, mock_ocr_spec, mock_classifier_spec
@@ -168,11 +174,12 @@ class TestClassifyAndOcrDocument:
         content = base64.b64encode(buf.getvalue()).decode()
 
         mock_ocr_spec.extract_text.return_value = ""
-        label, score, ocr = pipeline_with_bbox.classify_and_ocr_document(
+        label, score, scores, ocr = pipeline_with_bbox.classify_and_ocr_document(
             content, "image/png"
         )
         assert label == "unknown"
         assert score == 0.0
+        assert scores == {}
         assert ocr is not None  # OCR result still returned (empty text, but with structure)
         mock_classifier_spec.classify.assert_not_called()
 
@@ -189,8 +196,9 @@ class TestClassifyAndOcrDocument:
         content = base64.b64encode(buf.getvalue()).decode()
 
         mock_ocr_spec.extract_text.return_value = "Some text"
-        label, score, ocr = pipeline.classify_and_ocr_document(
+        label, score, scores, ocr = pipeline.classify_and_ocr_document(
             content, "image/png"
         )
         assert ocr is not None
         assert ocr.pages[0].blocks == []
+        assert "invoice" in scores

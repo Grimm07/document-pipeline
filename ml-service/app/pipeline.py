@@ -45,7 +45,9 @@ class DocumentPipeline:
         self._ocr_max_pdf_pages = ocr_max_pdf_pages
         self._bbox_extractor = bbox_extractor
 
-    def classify_document(self, content_b64: str, mime_type: str) -> tuple[str, float]:
+    def classify_document(
+        self, content_b64: str, mime_type: str
+    ) -> tuple[str, float, dict[str, float]]:
         """Classify a document and return the top label with confidence.
 
         Args:
@@ -53,21 +55,21 @@ class DocumentPipeline:
             mime_type: MIME type of the document.
 
         Returns:
-            Tuple of (label, confidence_score). Returns ("unknown", 0.0) if
-            no text can be extracted.
+            Tuple of (label, confidence_score, all_scores). Returns
+            ("unknown", 0.0, {}) if no text can be extracted.
         """
         raw_bytes = base64.b64decode(content_b64)
         text = self._extract_text(raw_bytes, mime_type)
 
         if not text or not text.strip():
             logger.warning("No text extracted for mime_type=%s", mime_type)
-            return ("unknown", 0.0)
+            return ("unknown", 0.0, {})
 
         return self._classifier.classify(text, self._candidate_labels)
 
     def classify_and_ocr_document(
         self, content_b64: str, mime_type: str
-    ) -> tuple[str, float, OcrResult | None]:
+    ) -> tuple[str, float, dict[str, float], OcrResult | None]:
         """Classify document and return OCR results with bounding boxes.
 
         For PDFs and images, returns full OCR data including per-page text
@@ -78,8 +80,8 @@ class DocumentPipeline:
             mime_type: MIME type of the document.
 
         Returns:
-            Tuple of (label, confidence_score, ocr_result). OCR result is None
-            for non-visual document types.
+            Tuple of (label, confidence_score, all_scores, ocr_result).
+            OCR result is None for non-visual document types.
         """
         raw_bytes = base64.b64decode(content_b64)
         mime_lower = mime_type.lower()
@@ -92,14 +94,16 @@ class DocumentPipeline:
             # Text and other types — no visual OCR needed
             text = self._extract_text(raw_bytes, mime_type)
             if not text or not text.strip():
-                return ("unknown", 0.0, None)
-            label, score = self._classifier.classify(text, self._candidate_labels)
-            return (label, score, None)
+                return ("unknown", 0.0, {}, None)
+            label, score, scores = self._classifier.classify(text, self._candidate_labels)
+            return (label, score, scores, None)
 
-    def _classify_pdf_with_ocr(self, raw_bytes: bytes) -> tuple[str, float, OcrResult | None]:
+    def _classify_pdf_with_ocr(
+        self, raw_bytes: bytes
+    ) -> tuple[str, float, dict[str, float], OcrResult | None]:
         page_data = pdf_bytes_to_images_with_dims(raw_bytes, max_pages=self._ocr_max_pdf_pages)
         if not page_data:
-            return ("unknown", 0.0, None)
+            return ("unknown", 0.0, {}, None)
 
         pages: list[OcrPage] = []
         all_texts: list[str] = []
@@ -122,12 +126,14 @@ class DocumentPipeline:
 
         full_text = "\n\n".join(all_texts)
         if not full_text.strip():
-            return ("unknown", 0.0, OcrResult(pages=pages, fullText=""))
+            return ("unknown", 0.0, {}, OcrResult(pages=pages, fullText=""))
 
-        label, score = self._classifier.classify(full_text, self._candidate_labels)
-        return (label, score, OcrResult(pages=pages, fullText=full_text))
+        label, score, scores = self._classifier.classify(full_text, self._candidate_labels)
+        return (label, score, scores, OcrResult(pages=pages, fullText=full_text))
 
-    def _classify_image_with_ocr(self, raw_bytes: bytes) -> tuple[str, float, OcrResult | None]:
+    def _classify_image_with_ocr(
+        self, raw_bytes: bytes
+    ) -> tuple[str, float, dict[str, float], OcrResult | None]:
         image = Image.open(io.BytesIO(raw_bytes)).convert("RGB")
         w, h = image.size
         page_text = self._ocr.extract_text(image)
@@ -147,10 +153,10 @@ class DocumentPipeline:
         )
 
         if not page_text.strip():
-            return ("unknown", 0.0, ocr_result)
+            return ("unknown", 0.0, {}, ocr_result)
 
-        label, score = self._classifier.classify(page_text, self._candidate_labels)
-        return (label, score, ocr_result)
+        label, score, scores = self._classifier.classify(page_text, self._candidate_labels)
+        return (label, score, scores, ocr_result)
 
     def _detect_blocks(self, image: Image.Image, page_text: str) -> list[TextBlock]:
         """Run PaddleOCR detection if extractor is available."""

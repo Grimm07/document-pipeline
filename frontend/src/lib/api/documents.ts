@@ -2,6 +2,7 @@ import type {
   DocumentResponse,
   DocumentListResponse,
   DocumentListFilters,
+  CorrectClassificationRequest,
   OcrResult,
 } from "@/types/api";
 import { apiFetch } from "./client";
@@ -55,6 +56,19 @@ export async function deleteDocument(id: string): Promise<void> {
 /** Retries classification for a document that failed or timed out. */
 export async function retryClassification(id: string): Promise<DocumentResponse> {
   return apiFetch<DocumentResponse>(`/documents/${id}/retry`, { method: "POST" });
+}
+
+/** Manually corrects a document's classification label. */
+export async function correctClassification(
+  id: string,
+  classification: string,
+): Promise<DocumentResponse> {
+  const body: CorrectClassificationRequest = { classification };
+  return apiFetch<DocumentResponse>(`/documents/${id}/classification`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }
 
 /**

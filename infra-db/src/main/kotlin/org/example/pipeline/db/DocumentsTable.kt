@@ -34,6 +34,12 @@ object DocumentsTable : Table("documents") {
     /** Confidence score from ML service (0.0 to 1.0) */
     val confidence = float("confidence").nullable()
 
+    /** All candidate label scores from ML classification as JSONB */
+    val labelScores = jsonb<Map<String, Float>>("label_scores", Json.Default).nullable()
+
+    /** Origin of the current classification: "ml" or "manual" */
+    val classificationSource = text("classification_source").default("ml")
+
     /** JSONB metadata column */
     val metadata = jsonb<Map<String, String>>("metadata", Json.Default)
 
@@ -42,6 +48,9 @@ object DocumentsTable : Table("documents") {
 
     /** Relative path to stored OCR results JSON file */
     val ocrStoragePath = text("ocr_storage_path").nullable()
+
+    /** Timestamp when a human corrected the classification */
+    val correctedAt = timestampWithTimeZone("corrected_at").nullable()
 
     /** Record creation timestamp */
     val createdAt = timestampWithTimeZone("created_at")

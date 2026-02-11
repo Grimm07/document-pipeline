@@ -57,14 +57,28 @@ interface DocumentRepository {
      * @param classification The new classification
      * @param confidence The confidence score
      * @param ocrStoragePath Optional path to stored OCR results
+     * @param labelScores Optional map of all candidate label scores
      * @return True if the document was updated, false if not found
      */
     suspend fun updateClassification(
         id: String,
         classification: String,
         confidence: Float,
-        ocrStoragePath: String? = null
+        ocrStoragePath: String? = null,
+        labelScores: Map<String, Float>? = null
     ): Boolean
+
+    /**
+     * Manually corrects the classification for a document.
+     *
+     * Sets the classification to the given value, marks the source as "manual",
+     * and records the correction timestamp. Preserves existing label scores.
+     *
+     * @param id The document UUID as string
+     * @param classification The corrected classification label
+     * @return True if the document was updated, false if not found
+     */
+    suspend fun correctClassification(id: String, classification: String): Boolean
 
     /**
      * Deletes a document by its ID.

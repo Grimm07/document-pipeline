@@ -112,11 +112,13 @@ def classify(request: ClassifyRequest):
 
     with PIPELINE_DURATION.labels(endpoint="/classify").time():
         try:
-            classification, confidence = _pipeline.classify_document(
+            classification, confidence, scores = _pipeline.classify_document(
                 request.content, request.mimeType
             )
             PIPELINE_REQUESTS_TOTAL.labels(endpoint="/classify", status="success").inc()
-            return ClassifyResponse(classification=classification, confidence=confidence)
+            return ClassifyResponse(
+                classification=classification, confidence=confidence, scores=scores
+            )
         except Exception as exc:
             PIPELINE_REQUESTS_TOTAL.labels(endpoint="/classify", status="error").inc()
             logger.exception("Classification failed")
@@ -141,13 +143,14 @@ def classify_with_ocr(request: ClassifyRequest):
 
     with PIPELINE_DURATION.labels(endpoint="/classify-with-ocr").time():
         try:
-            classification, confidence, ocr_result = _pipeline.classify_and_ocr_document(
+            classification, confidence, scores, ocr_result = _pipeline.classify_and_ocr_document(
                 request.content, request.mimeType
             )
             PIPELINE_REQUESTS_TOTAL.labels(endpoint="/classify-with-ocr", status="success").inc()
             return ClassifyWithOcrResponse(
                 classification=classification,
                 confidence=confidence,
+                scores=scores,
                 ocr=ocr_result,
             )
         except Exception as exc:

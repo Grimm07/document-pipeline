@@ -3,7 +3,7 @@ import { ArrowLeft, Download, Loader2, AlertTriangle, RefreshCw, Trash2 } from "
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { ClassificationBadge } from "@/components/documents/classification-badge";
+import { LabelCorrectionPopover } from "@/components/documents/label-correction-popover";
 import { DeleteDocumentDialog } from "@/components/documents/delete-document-dialog";
 import { DocumentViewerTabs } from "@/components/preview/document-viewer-tabs";
 import { LoadingSpinner } from "@/components/shared/loading-spinner";
@@ -78,7 +78,13 @@ function DocumentDetailPage() {
             <DetailRow label="Classification">
               <div className="flex flex-col items-end gap-1">
                 <div className="flex items-center gap-2">
-                  <ClassificationBadge classification={doc.classification} />
+                  <LabelCorrectionPopover
+                    documentId={doc.id}
+                    classification={doc.classification}
+                    labelScores={doc.labelScores}
+                    classificationSource={doc.classificationSource}
+                    disabled={isClassifying || isTimedOut}
+                  />
                   {isClassifying && (
                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Loader2 className="size-3 animate-spin" />
@@ -111,6 +117,9 @@ function DocumentDetailPage() {
               </div>
             </DetailRow>
             <DetailRow label="Confidence">{formatConfidence(doc.confidence)}</DetailRow>
+            {doc.correctedAt && (
+              <DetailRow label="Corrected">{formatDate(doc.correctedAt)}</DetailRow>
+            )}
             <Separator />
             <DetailRow label="MIME Type">{doc.mimeType}</DetailRow>
             <DetailRow label="Size">{formatFileSize(doc.fileSizeBytes)}</DetailRow>

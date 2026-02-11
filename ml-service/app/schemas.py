@@ -21,10 +21,12 @@ class ClassifyResponse(BaseModel):
     Attributes:
         classification: Top predicted document label.
         confidence: Confidence score for the top label (0.0 to 1.0).
+        scores: All candidate label scores keyed by label name.
     """
 
     classification: str
     confidence: float
+    scores: dict[str, float] = {}
 
 
 class BoundingBox(BaseModel):
@@ -93,11 +95,13 @@ class ClassifyWithOcrResponse(BaseModel):
     Attributes:
         classification: Top predicted document label.
         confidence: Confidence score for the top label (0.0 to 1.0).
+        scores: All candidate label scores keyed by label name.
         ocr: OCR results with bounding boxes, or None for text documents.
     """
 
     classification: str
     confidence: float
+    scores: dict[str, float] = {}
     ocr: OcrResult | None = None
 
 

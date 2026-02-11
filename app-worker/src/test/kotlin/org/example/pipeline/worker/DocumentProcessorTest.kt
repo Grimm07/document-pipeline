@@ -46,7 +46,7 @@ class DocumentProcessorTest : FunSpec({
             coEvery { mockRepo.getById(testDocId) } returns doc
             coEvery { mockStorage.retrieve(doc.storagePath) } returns content
             coEvery { mockClassification.classify(content, "application/pdf") } returns result
-            coEvery { mockRepo.updateClassification(testDocId, "invoice", 0.95f, null) } returns true
+            coEvery { mockRepo.updateClassification(testDocId, "invoice", 0.95f, null, labelScores = null) } returns true
 
             processor.process(testDocId)
 
@@ -54,7 +54,7 @@ class DocumentProcessorTest : FunSpec({
                 mockRepo.getById(testDocId)
                 mockStorage.retrieve(doc.storagePath)
                 mockClassification.classify(content, "application/pdf")
-                mockRepo.updateClassification(testDocId, "invoice", 0.95f, null)
+                mockRepo.updateClassification(testDocId, "invoice", 0.95f, null, labelScores = null)
             }
         }
 
@@ -66,7 +66,7 @@ class DocumentProcessorTest : FunSpec({
             coEvery { mockRepo.getById(testDocId) } returns doc
             coEvery { mockStorage.retrieve(doc.storagePath) } returns content
             coEvery { mockClassification.classify(content, "image/png") } returns result
-            coEvery { mockRepo.updateClassification(any(), any(), any(), any()) } returns true
+            coEvery { mockRepo.updateClassification(any(), any(), any(), any(), labelScores = any()) } returns true
 
             processor.process(testDocId)
 
@@ -84,12 +84,12 @@ class DocumentProcessorTest : FunSpec({
             coEvery { mockStorage.retrieve(doc.storagePath) } returns content
             coEvery { mockClassification.classify(content, "application/pdf") } returns result
             coEvery { mockStorage.store("$testDocId-ocr", "ocr-results.json", any()) } returns ocrPath
-            coEvery { mockRepo.updateClassification(testDocId, "invoice", 0.95f, ocrPath) } returns true
+            coEvery { mockRepo.updateClassification(testDocId, "invoice", 0.95f, ocrPath, labelScores = null) } returns true
 
             processor.process(testDocId)
 
             coVerify { mockStorage.store("$testDocId-ocr", "ocr-results.json", ocrJson.toByteArray()) }
-            coVerify { mockRepo.updateClassification(testDocId, "invoice", 0.95f, ocrPath) }
+            coVerify { mockRepo.updateClassification(testDocId, "invoice", 0.95f, ocrPath, labelScores = null) }
         }
 
         test("does not store OCR file when ocrResultJson is null") {
@@ -100,12 +100,12 @@ class DocumentProcessorTest : FunSpec({
             coEvery { mockRepo.getById(testDocId) } returns doc
             coEvery { mockStorage.retrieve(doc.storagePath) } returns content
             coEvery { mockClassification.classify(content, "application/pdf") } returns result
-            coEvery { mockRepo.updateClassification(testDocId, "report", 0.9f, null) } returns true
+            coEvery { mockRepo.updateClassification(testDocId, "report", 0.9f, null, labelScores = null) } returns true
 
             processor.process(testDocId)
 
             coVerify(exactly = 0) { mockStorage.store(match { it.endsWith("-ocr") }, any(), any()) }
-            coVerify { mockRepo.updateClassification(testDocId, "report", 0.9f, null) }
+            coVerify { mockRepo.updateClassification(testDocId, "report", 0.9f, null, labelScores = null) }
         }
     }
 
@@ -155,7 +155,7 @@ class DocumentProcessorTest : FunSpec({
                 processor.process(testDocId)
             }
 
-            coVerify(exactly = 0) { mockRepo.updateClassification(any(), any(), any(), any()) }
+            coVerify(exactly = 0) { mockRepo.updateClassification(any(), any(), any(), any(), labelScores = any()) }
         }
     }
 
@@ -168,7 +168,7 @@ class DocumentProcessorTest : FunSpec({
             coEvery { mockRepo.getById(testDocId) } returns doc
             coEvery { mockStorage.retrieve(doc.storagePath) } returns content
             coEvery { mockClassification.classify(content, "application/pdf") } returns result
-            coEvery { mockRepo.updateClassification(testDocId, "invoice", 0.9f, null) } returns false
+            coEvery { mockRepo.updateClassification(testDocId, "invoice", 0.9f, null, labelScores = null) } returns false
 
             // Should not throw — just log that update failed
             // or it might throw — either behavior is acceptable
@@ -178,7 +178,7 @@ class DocumentProcessorTest : FunSpec({
                 // acceptable
             }
 
-            coVerify { mockRepo.updateClassification(testDocId, "invoice", 0.9f, null) }
+            coVerify { mockRepo.updateClassification(testDocId, "invoice", 0.9f, null, labelScores = null) }
         }
     }
 
@@ -195,7 +195,7 @@ class DocumentProcessorTest : FunSpec({
 
                 coEvery { mockRepo.getById("proc-path-id") } returns doc
                 coEvery { mockClassification.classify(content, "application/pdf") } returns result
-                coEvery { mockRepo.updateClassification("proc-path-id", "report", 0.85f, null) } returns true
+                coEvery { mockRepo.updateClassification("proc-path-id", "report", 0.85f, null, labelScores = null) } returns true
 
                 val realProcessor = DocumentProcessor(mockRepo, realStorage, mockClassification)
                 realProcessor.process("proc-path-id")
@@ -243,7 +243,7 @@ class DocumentProcessorTest : FunSpec({
             }
 
             // Verify updateClassification was NOT called (OCR store failed first)
-            coVerify(exactly = 0) { mockRepo.updateClassification(any(), any(), any(), any()) }
+            coVerify(exactly = 0) { mockRepo.updateClassification(any(), any(), any(), any(), labelScores = any()) }
         }
 
         test("handles very large OCR JSON") {
@@ -259,7 +259,7 @@ class DocumentProcessorTest : FunSpec({
             coEvery { mockStorage.retrieve(doc.storagePath) } returns content
             coEvery { mockClassification.classify(content, "application/pdf") } returns result
             coEvery { mockStorage.store("$testDocId-ocr", "ocr-results.json", any()) } returns ocrPath
-            coEvery { mockRepo.updateClassification(testDocId, "invoice", 0.95f, ocrPath) } returns true
+            coEvery { mockRepo.updateClassification(testDocId, "invoice", 0.95f, ocrPath, labelScores = null) } returns true
 
             processor.process(testDocId)
 

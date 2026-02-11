@@ -85,7 +85,7 @@ def mock_ocr():
 def mock_classifier_spec():
     """Fully mocked ClassifierService (for pipeline integration tests)."""
     mock = create_autospec(ClassifierService, instance=True)
-    mock.classify.return_value = ("invoice", 0.85)
+    mock.classify.return_value = ("invoice", 0.85, {"invoice": 0.85, "contract": 0.10, "report": 0.05})
     return mock
 
 

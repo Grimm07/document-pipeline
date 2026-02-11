@@ -69,6 +69,15 @@ class ClassificationResultTest : FunSpec({
             json.decodeFromString<ClassificationResult>(json.encodeToString(low)) shouldBe low
             json.decodeFromString<ClassificationResult>(json.encodeToString(high)) shouldBe high
         }
+
+        test("round-trip with labelScores") {
+            val scores = mapOf("invoice" to 0.85f, "contract" to 0.10f, "report" to 0.05f)
+            val result = ClassificationResult("invoice", 0.85f, labelScores = scores)
+            val serialized = json.encodeToString(result)
+            val deserialized = json.decodeFromString<ClassificationResult>(serialized)
+            deserialized shouldBe result
+            deserialized.labelScores shouldBe scores
+        }
     }
 
     context("property-based") {

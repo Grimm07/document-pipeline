@@ -19,8 +19,8 @@ def loaded_client():
     import app.main as main_module
 
     mock_pipeline = MagicMock()
-    mock_pipeline.classify_document.return_value = ("invoice", 0.92)
-    mock_pipeline.classify_and_ocr_document.return_value = ("invoice", 0.92, None)
+    mock_pipeline.classify_document.return_value = ("invoice", 0.92, {"invoice": 0.92, "contract": 0.05, "report": 0.03})
+    mock_pipeline.classify_and_ocr_document.return_value = ("invoice", 0.92, {"invoice": 0.92, "contract": 0.05, "report": 0.03}, None)
 
     original_pipeline = main_module._pipeline
     original_loaded = main_module._models_loaded
@@ -114,16 +114,17 @@ class TestClassifyEndpoint:
         assert response.status_code == 422
 
     def test_classify_response_matches_kotlin_contract(self, loaded_client):
-        """The Kotlin client expects exactly 'classification' and 'confidence' fields."""
+        """The Kotlin client expects 'classification', 'confidence', and 'scores' fields."""
         content = base64.b64encode(b"test").decode()
         response = loaded_client.post(
             "/classify",
             json={"content": content, "mimeType": "text/plain"},
         )
         data = response.json()
-        assert set(data.keys()) == {"classification", "confidence"}
+        assert set(data.keys()) == {"classification", "confidence", "scores"}
         assert isinstance(data["classification"], str)
         assert isinstance(data["confidence"], (int, float))
+        assert isinstance(data["scores"], dict)
 
 
 class TestClassifyWithOcrEndpoint:
@@ -150,7 +151,7 @@ class TestClassifyWithOcrEndpoint:
             fullText="page text",
         )
         main_module._pipeline.classify_and_ocr_document.return_value = (
-            "report", 0.88, ocr
+            "report", 0.88, {"report": 0.88, "invoice": 0.07, "contract": 0.05}, ocr
         )
 
         content = base64.b64encode(b"pdf content").decode()
@@ -186,14 +187,14 @@ class TestClassifyWithOcrEndpoint:
         assert response.status_code == 500
 
     def test_classify_with_ocr_response_shape(self, loaded_client):
-        """Response must include classification, confidence, and ocr fields."""
+        """Response must include classification, confidence, scores, and ocr fields."""
         content = base64.b64encode(b"test").decode()
         response = loaded_client.post(
             "/classify-with-ocr",
             json={"content": content, "mimeType": "text/plain"},
         )
         data = response.json()
-        assert set(data.keys()) == {"classification", "confidence", "ocr"}
+        assert set(data.keys()) == {"classification", "confidence", "scores", "ocr"}
 
 
 def test_metrics_endpoint(loaded_client):

@@ -82,7 +82,28 @@ export const handlers = [
         id: id as string,
         classification: "unclassified",
         confidence: null,
+        labelScores: null,
+        classificationSource: "ml",
         hasOcrResults: false,
+        correctedAt: null,
+        updatedAt: new Date().toISOString(),
+      }),
+    );
+  }),
+
+  // Correct classification
+  http.patch("/api/documents/:id/classification", async ({ params, request }) => {
+    const id = params.id as string;
+    if (id === "nonexistent") {
+      return HttpResponse.json({ error: "Document not found" }, { status: 404 });
+    }
+    const body = (await request.json()) as { classification: string };
+    return HttpResponse.json(
+      createMockDocument({
+        id: id as string,
+        classification: body.classification,
+        classificationSource: "manual",
+        correctedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }),
     );

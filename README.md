@@ -110,6 +110,7 @@ curl localhost:3000/api/health              # Grafana dashboard
 | `GET` | `/api/documents/{id}` | Get document detail |
 | `GET` | `/api/documents/{id}/download` | Download original file |
 | `GET` | `/api/documents/{id}/ocr` | Get OCR results JSON (bounding boxes + full text) |
+| `PATCH` | `/api/documents/{id}/classification` | Manually correct classification label |
 | `DELETE` | `/api/documents/{id}` | Delete document and associated files |
 | `POST` | `/api/documents/{id}/retry` | Re-queue document for classification |
 | `GET` | `/api/health` | Liveness probe — returns `{"status":"ok"}` |
@@ -121,7 +122,7 @@ React 19 SPA with TanStack Router, TanStack Query, Tailwind CSS v4, and shadcn/u
 
 - **Dashboard** — Upload count, classification breakdown
 - **Document list** — Filter by classification, multi-select with bulk delete
-- **Document detail** — Metadata, classification badge, download, retry, delete
+- **Document detail** — Metadata, classification with label scores popover, inline correction, download, retry, delete
 - **Rich viewers** — JSON (`react-json-view-lite`), XML (`react-xml-viewer`), PDF deep zoom (`pdfjs-dist` + `openseadragon`), images, plain text
 - **OCR results** — Tabbed viewer with OCR text tab and bounding box overlay on PDF pages
 - **Dark/light mode** — Glassmorphism theme with CSS custom properties
@@ -158,7 +159,7 @@ For CPU-only mode, set `ML_DEVICE=cpu` and `ML_TORCH_DTYPE=float32` in the envir
 ./gradlew :infra-db:test               # Single module (infra-db and infra-queue need Docker)
 
 # Frontend — Vitest + React Testing Library + MSW
-cd frontend && npm test                # 90 tests across 22 files
+cd frontend && npm test                # 104 tests across 24 files
 
 # Frontend E2E — Playwright (requires running backend)
 cd frontend && npm run test:e2e
@@ -248,11 +249,12 @@ ML service uses `ML_`-prefixed env vars: `ML_DEVICE`, `ML_TORCH_DTYPE`, `ML_HF_H
 | 4 | Documentation & code quality (Detekt, Ruff, ESLint, KDoc, docstrings, JSDoc) | Done |
 | 5 | Build & DevEx (Gradle config cache, Docker health checks) | Done |
 | 6 | Observability & logging (Prometheus metrics, correlation IDs, structured logging) | Done |
-| 7 | Model explainability (per-label scores, attention attribution) | Planned |
+| 7 | Model explainability & label correction (per-label scores, inline correction UI) | Done |
 | 8 | CI/CD (GitHub Actions, Docker image builds, GHCR) | Planned |
 | 9 | Log ingestion & analytics — new Go service with dashboard | Planned |
 | 10 | WebSocket push updates | Planned |
 | 11 | Frontend observability | Planned |
+| 12 | Label-based model fine-tuning (build training set from human corrections) | Planned |
 
 ## License
 
