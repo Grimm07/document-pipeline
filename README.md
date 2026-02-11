@@ -7,33 +7,16 @@ Includes a React SPA frontend with rich document viewers, a Python FastAPI ML se
 ## Architecture
 
 ```
-┌──────────────────────┐
-│  Frontend (Vite SPA) │
-└──────────┬───────────┘
-           │ /api proxy
-           ▼
-┌──────────────────────┐       ┌───────────────┐
-│  REST API (app-api)  ├──────▶│ File Storage  │
-└──┬───────────────┬───┘       └──────▲────────┘
-   │               │                  │
-   ▼               ▼                  │
-┌────────────┐  ┌──────────┐          │
-│ PostgreSQL │  │ RabbitMQ │          │
-└─────▲──────┘  └────┬─────┘          │
-      │          consume│              │
-      │               ▼               │
-      │  ┌─────────────────────┐      │
-      └──┤ Worker (app-worker) ├──────┘
-         └──────────┬──────────┘
-                    │ POST /classify-with-ocr
-                    ▼
-         ┌─────────────────────┐
-         │ ML Service (FastAPI)│
-         ├─────────────────────┤
-         │ DeBERTa  Zero-Shot  │
-         │ GOT-OCR2 OCR       │
-         │ PaddleOCR Bbox Det. │
-         └─────────────────────┘
+frontend/ ──────── (React SPA, Vite, npm-managed) ──▶ app-api via HTTP (/api proxy)
+
+app-api  ──┐
+app-worker ─┤──▶ core-domain (interfaces + models, zero framework deps)
+            │
+            ├──▶ infra-db       (Exposed + Flyway + HikariCP → PostgreSQL)
+            ├──▶ infra-storage  (local filesystem, date-based paths)
+            └──▶ infra-queue    (RabbitMQ publisher + consumer)
+
+ml-service/ ────── (Python FastAPI, pip-managed) ◀── app-worker via HTTP (POST /classify-with-ocr)
 ```
 
 ### Data Flow
