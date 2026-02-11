@@ -6,19 +6,17 @@ Includes a React SPA frontend with rich document viewers, a Python FastAPI ML se
 
 ## Architecture
 
-```mermaid
-graph TD
-    Frontend["React Frontend<br/>(Vite SPA)"] -->|"/api proxy"| API["Ktor REST API<br/>(app-api)"]
-    API --> Storage["File Storage<br/>(Local Filesystem)"]
-    API --> DB[("PostgreSQL")]
-    API -->|publish| RMQ["RabbitMQ"]
-    RMQ -->|consume| Worker["Background Worker<br/>(app-worker)"]
-    Worker --> DB
-    Worker --> Storage
-    Worker -->|"POST /classify-with-ocr"| ML["ML Service<br/>(FastAPI)"]
-    ML --> ZS["DeBERTa-v3-large<br/>Zero-Shot Classification"]
-    ML --> OCR["GOT-OCR2<br/>OCR"]
-    ML --> BB["PaddleOCR<br/>Bounding Boxes"]
+```
+frontend/ ──────── (React SPA, Vite, npm-managed) ──▶ app-api via HTTP (/api proxy)
+
+app-api  ──┐
+app-worker ─┤──▶ core-domain (interfaces + models, zero framework deps)
+            │
+            ├──▶ infra-db       (Exposed + Flyway + HikariCP → PostgreSQL)
+            ├──▶ infra-storage  (local filesystem, date-based paths)
+            └──▶ infra-queue    (RabbitMQ publisher + consumer)
+
+ml-service/ ────── (Python FastAPI, pip-managed) ◀── app-worker via HTTP (POST /classify-with-ocr)
 ```
 
 ### Data Flow
