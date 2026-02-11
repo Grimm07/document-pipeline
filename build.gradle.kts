@@ -14,7 +14,7 @@ subprojects {
         tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
             compilerOptions {
                 jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
-                freeCompilerArgs.addAll("-Xjsr305=strict")
+                freeCompilerArgs.addAll("-Xjsr305=strict", "-opt-in=kotlin.time.ExperimentalTime")
             }
         }
 

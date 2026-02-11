@@ -61,6 +61,26 @@ interface DocumentRepository {
     suspend fun updateClassification(
         id: String,
         classification: String,
-        confidence: Float
+        confidence: Float,
+        ocrStoragePath: String? = null
     ): Boolean
+
+    /**
+     * Deletes a document by its ID.
+     *
+     * @param id The document UUID as string
+     * @return True if a row was deleted, false if not found
+     */
+    suspend fun delete(id: String): Boolean
+
+    /**
+     * Resets classification for a document back to "unclassified".
+     *
+     * Sets classification to "unclassified", nulls confidence and ocrStoragePath,
+     * and updates the updatedAt timestamp.
+     *
+     * @param id The document UUID as string
+     * @return True if the document was updated, false if not found
+     */
+    suspend fun resetClassification(id: String): Boolean
 }

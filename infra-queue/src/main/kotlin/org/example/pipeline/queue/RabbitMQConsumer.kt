@@ -31,7 +31,40 @@ class RabbitMQConsumer(
      * Failed messages are nack'd and sent to the dead letter queue.
      */
     fun start() {
-        TODO("Implement: Create channel, declare topology, set up consumer with DeliverCallback, handle ack/nack")
+        channel = connection.createChannel().also { declareTopology(it) }
+        channel!!.basicQos(1)
+
+        val deliverCallback = DeliverCallback { _, delivery ->
+            val body = String(delivery.body)
+            val docMessage = try {
+                json.decodeFromString<DocumentMessage>(body)
+            } catch (e: Exception) {
+                logger.error("Failed to parse message, nacking: {}", body.take(200), e)
+                channel!!.basicNack(delivery.envelope.deliveryTag, false, false)
+                return@DeliverCallback
+            }
+            scope.launch {
+                try {
+                    messageHandler(docMessage.documentId)
+                    channel!!.basicAck(delivery.envelope.deliveryTag, false)
+                } catch (e: Exception) {
+                    val requeue = !delivery.envelope.isRedeliver
+                    logger.error(
+                        "Failed to process message: {} (requeue={})",
+                        docMessage.documentId, requeue, e
+                    )
+                    channel!!.basicNack(delivery.envelope.deliveryTag, false, requeue)
+                }
+            }
+        }
+
+        consumerTag = channel!!.basicConsume(
+            QueueConstants.DOCUMENT_CLASSIFICATION_QUEUE,
+            false,
+            deliverCallback,
+            CancelCallback { tag -> logger.warn("Consumer $tag cancelled by broker") }
+        )
+        logger.info("RabbitMQ consumer started with tag: {}", consumerTag)
     }
 
     /**
@@ -53,6 +86,13 @@ class RabbitMQConsumer(
      * Declares the queue topology (should match publisher).
      */
     private fun declareTopology(channel: Channel) {
-        TODO("Implement: Declare exchange, queue with DLX, and binding - same as publisher")
+        channel.exchangeDeclare(QueueConstants.DOCUMENT_EXCHANGE, "topic", true)
+        channel.exchangeDeclare(QueueConstants.DLX_EXCHANGE, "fanout", true)
+        channel.queueDeclare(QueueConstants.DLX_QUEUE, true, false, false, null)
+        channel.queueBind(QueueConstants.DLX_QUEUE, QueueConstants.DLX_EXCHANGE, "")
+        val queueArgs = mapOf<String, Any>("x-dead-letter-exchange" to QueueConstants.DLX_EXCHANGE)
+        channel.queueDeclare(QueueConstants.DOCUMENT_CLASSIFICATION_QUEUE, true, false, false, queueArgs)
+        channel.queueBind(QueueConstants.DOCUMENT_CLASSIFICATION_QUEUE, QueueConstants.DOCUMENT_EXCHANGE, QueueConstants.CLASSIFICATION_ROUTING_KEY)
+        logger.info("RabbitMQ topology declared (consumer)")
     }
 }

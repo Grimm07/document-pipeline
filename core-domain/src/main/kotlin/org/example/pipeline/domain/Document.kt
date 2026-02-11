@@ -34,6 +34,7 @@ data class Document(
     val confidence: Float? = null,
     val metadata: Map<String, String> = emptyMap(),
     val uploadedBy: String? = null,
+    val ocrStoragePath: String? = null,
     val createdAt: Instant,
     val updatedAt: Instant
 )

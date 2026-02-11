@@ -3,14 +3,17 @@ package org.example.pipeline.api
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
+import io.ktor.server.config.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import kotlinx.serialization.json.Json
 import org.example.pipeline.api.di.apiModule
 import org.example.pipeline.api.routes.documentRoutes
+import org.koin.ktor.ext.inject
 import org.koin.ktor.plugin.Koin
 import org.koin.logger.slf4jLogger
 import org.slf4j.LoggerFactory
@@ -33,6 +36,23 @@ fun Application.module() {
     install(Koin) {
         slf4jLogger()
         modules(apiModule)
+    }
+
+    // Install CORS for frontend access
+    val config by inject<HoconApplicationConfig>()
+    val allowedHosts = config.propertyOrNull("cors.allowedHosts")
+        ?.getList() ?: listOf("localhost:5173", "localhost:4173")
+
+    install(CORS) {
+        allowedHosts.forEach { host ->
+            allowHost(host, schemes = listOf("http", "https"))
+        }
+        allowMethod(HttpMethod.Get)
+        allowMethod(HttpMethod.Post)
+        allowMethod(HttpMethod.Delete)
+        allowMethod(HttpMethod.Options)
+        allowHeader(HttpHeaders.ContentType)
+        allowHeader(HttpHeaders.Accept)
     }
 
     // Install content negotiation with JSON

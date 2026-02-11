@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -41,9 +39,37 @@ services:
     networks:
       - pipeline-network
 
+  ml-service:
+    build:
+      context: ../ml-service
+    container_name: document-pipeline-ml
+    ports:
+      - "8000:8000"
+    volumes:
+      - ml_models:/models
+    environment:
+      ML_DEVICE: cuda
+      ML_HF_HOME: /models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    networks:
+      - pipeline-network
+
 volumes:
   postgres_data:
   rabbitmq_data:
+  ml_models:
 
 networks:
   pipeline-network:

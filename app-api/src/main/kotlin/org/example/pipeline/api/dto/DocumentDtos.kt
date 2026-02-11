@@ -3,7 +3,6 @@ package org.example.pipeline.api.dto
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 import org.example.pipeline.domain.Document
-import kotlin.uuid.ExperimentalUuidApi
 
 /**
  * Response DTO for document data.
@@ -18,6 +17,7 @@ data class DocumentResponse(
     val confidence: Float?,
     val metadata: Map<String, String>,
     val uploadedBy: String?,
+    val hasOcrResults: Boolean,
     val createdAt: String,
     val updatedAt: String
 )
@@ -63,6 +63,7 @@ fun Document.toResponse(): DocumentResponse = DocumentResponse(
     confidence = confidence,
     metadata = metadata,
     uploadedBy = uploadedBy,
+    hasOcrResults = ocrStoragePath != null,
     createdAt = createdAt.toString(),
     updatedAt = updatedAt.toString()
 )

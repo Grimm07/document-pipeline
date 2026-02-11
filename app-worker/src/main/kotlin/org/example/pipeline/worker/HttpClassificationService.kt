@@ -9,6 +9,7 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import org.example.pipeline.domain.ClassificationResult
 import org.example.pipeline.domain.ClassificationService
 import org.slf4j.LoggerFactory
@@ -21,7 +22,8 @@ import org.slf4j.LoggerFactory
  * @property baseUrl Base URL of the ML classification service
  */
 class HttpClassificationService(
-    private val baseUrl: String
+    private val baseUrl: String,
+    private val requestTimeoutMs: Long = 300_000
 ) : ClassificationService {
 
     private val logger = LoggerFactory.getLogger(HttpClassificationService::class.java)
@@ -35,37 +37,46 @@ class HttpClassificationService(
         }
 
         engine {
-            requestTimeout = 30_000 // 30 seconds for ML inference
+            requestTimeout = requestTimeoutMs
         }
     }
 
     override suspend fun classify(content: ByteArray, mimeType: String): ClassificationResult {
-        TODO("""
-            Implement ML service call:
-            1. Create request payload (base64 encoded content + mimeType, or multipart)
-            2. POST to $baseUrl/classify
-            3. Parse response into ClassificationResult
-            4. Handle errors (timeout, service unavailable, etc.)
-            5. Log classification result
-        """)
+        val base64Content = java.util.Base64.getEncoder().encodeToString(content)
+        val request = ClassifyRequest(content = base64Content, mimeType = mimeType)
+
+        val response = client.post("$baseUrl/classify-with-ocr") {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+
+        if (!response.status.isSuccess()) {
+            throw RuntimeException("Classification service returned ${response.status}")
+        }
+
+        val classifyResponse = response.body<ClassifyWithOcrResponse>()
+        logger.info("Classification result: {} (confidence: {})", classifyResponse.classification, classifyResponse.confidence)
+
+        val ocrJson = classifyResponse.ocr?.let { Json.encodeToString(it) }
+
+        return ClassificationResult(
+            classification = classifyResponse.classification,
+            confidence = classifyResponse.confidence,
+            ocrResultJson = ocrJson
+        )
     }
 
-    /**
-     * Request payload for the ML service.
-     */
     @Serializable
     private data class ClassifyRequest(
-        val content: String, // Base64 encoded
+        val content: String,
         val mimeType: String
     )
 
-    /**
-     * Response from the ML service.
-     */
     @Serializable
-    private data class ClassifyResponse(
+    private data class ClassifyWithOcrResponse(
         val classification: String,
-        val confidence: Float
+        val confidence: Float,
+        val ocr: JsonElement? = null
     )
 
     /**

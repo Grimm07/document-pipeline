@@ -40,6 +40,9 @@ object DocumentsTable : Table("documents") {
     /** Optional user identifier */
     val uploadedBy = text("uploaded_by").nullable()
 
+    /** Relative path to stored OCR results JSON file */
+    val ocrStoragePath = text("ocr_storage_path").nullable()
+
     /** Record creation timestamp */
     val createdAt = timestampWithTimeZone("created_at")
 

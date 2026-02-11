@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "postgres": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@anthropic-ai/postgres-mcp@latest",
+        "postgresql://${DATABASE_USERNAME:-pipeline}:${DATABASE_PASSWORD:-pipeline_secret}@${DATABASE_HOST:-localhost}:${DATABASE_PORT:-5432}/${DATABASE_NAME:-document_pipeline}"
+      ]
+    }
+  }
+}

@@ -9,6 +9,7 @@ import org.example.pipeline.storage.LocalFileStorageService
 import org.example.pipeline.worker.DocumentProcessor
 import org.example.pipeline.worker.HttpClassificationService
 import org.koin.dsl.module
+import org.koin.dsl.onClose
 import java.nio.file.Paths
 
 /**
@@ -33,7 +34,10 @@ fun workerModule(config: HoconApplicationConfig) = module {
     // ML Classification service
     single<ClassificationService> {
         val mlServiceUrl = config.property("mlService.baseUrl").getString()
-        HttpClassificationService(mlServiceUrl)
+        val timeoutMs = config.property("mlService.timeoutMs").getString().toLong()
+        HttpClassificationService(mlServiceUrl, timeoutMs)
+    } onClose { service ->
+        (service as? HttpClassificationService)?.close()
     }
 
     // Document processor

@@ -53,7 +53,6 @@ object DatabaseConfig {
             this.password = password
             this.maximumPoolSize = maxPoolSize
             this.isAutoCommit = false
-            this.transactionIsolation = "TRANSACTION_REPEATABLE_READ"
             this.driverClassName = "org.postgresql.Driver"
 
             // Connection validation

@@ -1,8 +1,5 @@
 rootProject.name = "document-pipeline"
 
-// Enable version catalog
-enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
-
 dependencyResolutionManagement {
     @Suppress("UnstableApiUsage")
     repositories {

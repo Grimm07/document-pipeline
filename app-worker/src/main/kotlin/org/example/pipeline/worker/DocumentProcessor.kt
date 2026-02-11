@@ -34,15 +34,33 @@ class DocumentProcessor(
     suspend fun process(documentId: String) {
         logger.info("Processing document: $documentId")
 
-        TODO("""
-            Implement document processing:
-            1. Fetch document from repository by ID
-            2. If not found, log warning and return (or throw)
-            3. Retrieve file content from storage using document.storagePath
-            4. If content is null, log error and return
-            5. Call classificationService.classify(content, document.mimeType)
-            6. Update document with classification result using repository.updateClassification
-            7. Log success with classification and confidence
-        """)
+        val document = documentRepository.getById(documentId)
+        if (document == null) {
+            logger.warn("Document not found: {}", documentId)
+            return
+        }
+
+        val content = fileStorageService.retrieve(document.storagePath)
+            ?: throw IllegalStateException("File content not found for document $documentId at ${document.storagePath}")
+
+        val result = classificationService.classify(content, document.mimeType)
+
+        val ocrJson = result.ocrResultJson
+        var ocrStoragePath: String? = null
+        if (ocrJson != null) {
+            ocrStoragePath = fileStorageService.store(
+                "$documentId-ocr", "ocr-results.json", ocrJson.toByteArray()
+            )
+            logger.info("Stored OCR results for document {} at {}", documentId, ocrStoragePath)
+        }
+
+        val updated = documentRepository.updateClassification(
+            documentId, result.classification, result.confidence, ocrStoragePath
+        )
+        if (!updated) {
+            logger.warn("Failed to update classification for document: {}", documentId)
+        } else {
+            logger.info("Document {} classified as {} (confidence: {})", documentId, result.classification, result.confidence)
+        }
     }
 }

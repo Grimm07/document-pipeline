@@ -51,3 +51,21 @@ document-storage/
 # Test output
 test-results/
 test-output/
+
+# Claude Code local settings (personal permissions)
+.claude/settings.local.json
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# ML service
+__pycache__/
+*.egg-info/
+.pytest_cache/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Large binary artifacts
+*.deb

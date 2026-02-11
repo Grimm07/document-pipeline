@@ -11,6 +11,7 @@ import org.example.pipeline.queue.RabbitMQConfig
 import org.example.pipeline.queue.RabbitMQPublisher
 import org.example.pipeline.storage.LocalFileStorageService
 import org.koin.dsl.module
+import org.koin.dsl.onClose
 import java.nio.file.Paths
 
 /**
@@ -34,6 +35,8 @@ val apiModule = module {
             password = config.property("database.password").getString(),
             maxPoolSize = config.propertyOrNull("database.maxPoolSize")?.getString()?.toIntOrNull() ?: 10
         )
+    } onClose { dataSource ->
+        (dataSource as? java.io.Closeable)?.close()
     }
 
     // Repository

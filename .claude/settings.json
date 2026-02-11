@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "filepath=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.file_path // empty'); if [ -n \"$filepath\" ] && echo \"$filepath\" | grep -qE 'db/migration/V[0-9]+__'; then echo 'BLOCK: Do not edit applied Flyway migrations. Create a new V{N+1}__ migration file instead.' >&2; exit 2; fi"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "filepath=$(echo \"$CLAUDE_TOOL_INPUT\" | jq -r '.file_path // empty'); module=$(echo \"$filepath\" | grep -oP '(core-domain|infra-db|infra-storage|infra-queue|app-api|app-worker)' | head -1); if [ -n \"$module\" ] && echo \"$filepath\" | grep -qE '\\.kt$'; then ./gradlew :$module:compileKotlin --quiet 2>&1 | tail -5; fi"
+          }
+        ]
+      }
+    ]
+  }
+}

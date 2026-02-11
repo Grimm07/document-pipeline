@@ -5,7 +5,7 @@ plugins {
 
 dependencies {
     // Domain module
-    implementation(projects.coreDomain)
+    implementation(project(":core-domain"))
 
     // RabbitMQ
     implementation(libs.rabbitmq.client)
@@ -20,5 +20,9 @@ dependencies {
     // Testing
     testImplementation(libs.kotlin.test)
     testImplementation(libs.junit.jupiter)
+    testImplementation(libs.bundles.kotest)
+    testImplementation(libs.mockk)
+    testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.bundles.testcontainers)
+    testImplementation(libs.kotest.extensions.testcontainers)
 }

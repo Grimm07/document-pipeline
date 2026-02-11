@@ -11,7 +11,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ClassificationResult(
     val classification: String,
-    val confidence: Float
+    val confidence: Float,
+    val ocrResultJson: String? = null
 ) {
     init {
         require(confidence in 0.0f..1.0f) {
