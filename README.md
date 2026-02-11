@@ -6,19 +6,34 @@ Includes a React SPA frontend with rich document viewers, a Python FastAPI ML se
 
 ## Architecture
 
-```mermaid
-graph TD
-    Frontend["React Frontend (Vite SPA)"] -->|/api proxy| API["Ktor REST API (app-api)"]
-    API --> Storage["File Storage (Local FS)"]
-    API --> DB[(PostgreSQL)]
-    API -->|publish| RMQ[RabbitMQ]
-    RMQ -->|consume| Worker["Background Worker (app-worker)"]
-    Worker --> DB
-    Worker --> Storage
-    Worker -->|POST /classify-with-ocr| ML["ML Service (FastAPI)"]
-    ML --> ZS["DeBERTa-v3-large Zero-Shot"]
-    ML --> OCR["GOT-OCR2 OCR"]
-    ML --> BB["PaddleOCR Bounding Boxes"]
+```
+┌──────────────────────┐
+│  Frontend (Vite SPA) │
+└──────────┬───────────┘
+           │ /api proxy
+           ▼
+┌──────────────────────┐       ┌───────────────┐
+│  REST API (app-api)  ├──────▶│ File Storage  │
+└──┬───────────────┬───┘       └──────▲────────┘
+   │               │                  │
+   ▼               ▼                  │
+┌────────────┐  ┌──────────┐          │
+│ PostgreSQL │  │ RabbitMQ │          │
+└─────▲──────┘  └────┬─────┘          │
+      │          consume│              │
+      │               ▼               │
+      │  ┌─────────────────────┐      │
+      └──┤ Worker (app-worker) ├──────┘
+         └──────────┬──────────┘
+                    │ POST /classify-with-ocr
+                    ▼
+         ┌─────────────────────┐
+         │ ML Service (FastAPI)│
+         ├─────────────────────┤
+         │ DeBERTa  Zero-Shot  │
+         │ GOT-OCR2 OCR       │
+         │ PaddleOCR Bbox Det. │
+         └─────────────────────┘
 ```
 
 ### Data Flow
