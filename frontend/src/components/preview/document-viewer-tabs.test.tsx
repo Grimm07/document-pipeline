@@ -37,7 +37,7 @@ describe("DocumentViewerTabs", () => {
         filename="photo.png"
         hasOcrResults={false}
       />,
-      { wrapper }
+      { wrapper },
     );
     // Should render ImagePreview directly, not tabs
     expect(screen.getByRole("img")).toBeInTheDocument();
@@ -52,7 +52,7 @@ describe("DocumentViewerTabs", () => {
         filename="scan.pdf"
         hasOcrResults={true}
       />,
-      { wrapper }
+      { wrapper },
     );
     expect(screen.getByText("Preview")).toBeInTheDocument();
     expect(screen.getByText("OCR Text")).toBeInTheDocument();

@@ -9,6 +9,7 @@ interface StatCardProps {
   className?: string;
 }
 
+/** Glassmorphism card displaying a single statistic with icon and label. */
 export function StatCard({ label, value, icon: Icon, className }: StatCardProps) {
   return (
     <Card className={cn("glass-card", className)}>

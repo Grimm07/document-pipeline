@@ -38,8 +38,12 @@ class ExposedDocumentRepository : DocumentRepository {
             row[metadata] = document.metadata
             row[uploadedBy] = document.uploadedBy
             row[ocrStoragePath] = document.ocrStoragePath
-            row[createdAt] = OffsetDateTime.ofInstant(document.createdAt.toJavaInstant(), ZoneOffset.UTC)
-            row[updatedAt] = OffsetDateTime.ofInstant(document.updatedAt.toJavaInstant(), ZoneOffset.UTC)
+            row[createdAt] = OffsetDateTime.ofInstant(
+                document.createdAt.toJavaInstant(), ZoneOffset.UTC
+            )
+            row[updatedAt] = OffsetDateTime.ofInstant(
+                document.updatedAt.toJavaInstant(), ZoneOffset.UTC
+            )
         }
         document
     }
@@ -48,7 +52,7 @@ class ExposedDocumentRepository : DocumentRepository {
         val uuid = try {
             UUID.fromString(id)
         } catch (e: IllegalArgumentException) {
-            logger.debug("Malformed UUID: {}", id)
+            logger.debug("Malformed UUID: {}", id, e)
             return@newSuspendedTransaction null
         }
         DocumentsTable.selectAll()
@@ -96,7 +100,8 @@ class ExposedDocumentRepository : DocumentRepository {
                     }
                 }
             }
-            val combinedCondition: Op<Boolean> = conditions.reduce { acc: Op<Boolean>, op: Op<Boolean> -> acc and op }
+            val combinedCondition: Op<Boolean> =
+                conditions.reduce { acc: Op<Boolean>, op: Op<Boolean> -> acc and op }
             DocumentsTable.selectAll()
                 .where { combinedCondition }
                 .limit(limit)
@@ -113,10 +118,12 @@ class ExposedDocumentRepository : DocumentRepository {
         val uuid = try {
             UUID.fromString(id)
         } catch (e: IllegalArgumentException) {
-            logger.debug("Malformed UUID for update: {}", id)
+            logger.debug("Malformed UUID for update: {}", id, e)
             return@newSuspendedTransaction false
         }
-        val now = OffsetDateTime.ofInstant(Clock.System.now().toJavaInstant(), ZoneOffset.UTC)
+        val now = OffsetDateTime.ofInstant(
+            Clock.System.now().toJavaInstant(), ZoneOffset.UTC
+        )
         val updatedCount = DocumentsTable.update({ DocumentsTable.id eq uuid }) {
             it[DocumentsTable.classification] = classification
             it[DocumentsTable.confidence] = confidence
@@ -132,7 +139,7 @@ class ExposedDocumentRepository : DocumentRepository {
         val uuid = try {
             UUID.fromString(id)
         } catch (e: IllegalArgumentException) {
-            logger.debug("Malformed UUID for delete: {}", id)
+            logger.debug("Malformed UUID for delete: {}", id, e)
             return@newSuspendedTransaction false
         }
         val deletedCount = DocumentsTable.deleteWhere { DocumentsTable.id eq uuid }
@@ -143,10 +150,12 @@ class ExposedDocumentRepository : DocumentRepository {
         val uuid = try {
             UUID.fromString(id)
         } catch (e: IllegalArgumentException) {
-            logger.debug("Malformed UUID for resetClassification: {}", id)
+            logger.debug("Malformed UUID for resetClassification: {}", id, e)
             return@newSuspendedTransaction false
         }
-        val now = OffsetDateTime.ofInstant(Clock.System.now().toJavaInstant(), ZoneOffset.UTC)
+        val now = OffsetDateTime.ofInstant(
+            Clock.System.now().toJavaInstant(), ZoneOffset.UTC
+        )
         val updatedCount = DocumentsTable.update({ DocumentsTable.id eq uuid }) {
             it[classification] = "unclassified"
             it[confidence] = null

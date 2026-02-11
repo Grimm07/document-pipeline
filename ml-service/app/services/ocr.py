@@ -1,3 +1,5 @@
+"""OCR text extraction using the GOT-OCR2 vision-language model."""
+
 import logging
 
 from PIL import Image
@@ -6,11 +8,25 @@ logger = logging.getLogger(__name__)
 
 
 class OCRService:
+    """Extracts text from images using a HuggingFace vision-language model.
+
+    The model is loaded lazily via ``load()`` to keep transformers/torch
+    imports out of module scope (required for WSL2 compatibility).
+    """
+
     def __init__(self) -> None:
+        """Initialize with no loaded model or processor."""
         self._model = None
         self._processor = None
 
     def load(self, model_name: str, device: str, torch_dtype: str) -> None:
+        """Load the OCR model and processor onto the specified device.
+
+        Args:
+            model_name: HuggingFace model ID (e.g. ``GOT-OCR-2.0-hf``).
+            device: PyTorch device string (``cuda`` or ``cpu``).
+            torch_dtype: PyTorch dtype name (e.g. ``float16``).
+        """
         import torch
         from transformers import AutoModelForImageTextToText, AutoProcessor
 
@@ -26,6 +42,14 @@ class OCRService:
         logger.info("OCR model loaded.")
 
     def extract_text(self, image: Image.Image) -> str:
+        """Extract text from a single image using the OCR model.
+
+        Args:
+            image: RGB PIL image to process.
+
+        Returns:
+            Extracted text, stripped of leading/trailing whitespace.
+        """
         inputs = self._processor(images=image, return_tensors="pt")
         inputs = {k: v.to(self._model.device) for k, v in inputs.items()}
         generated_ids = self._model.generate(
@@ -43,6 +67,14 @@ class OCRService:
         return decoded.strip()
 
     def extract_text_from_images(self, images: list[Image.Image]) -> str:
+        """Extract and concatenate text from multiple images.
+
+        Args:
+            images: List of RGB PIL images (e.g. PDF pages).
+
+        Returns:
+            Concatenated text from all images, separated by double newlines.
+        """
         texts = []
         for i, image in enumerate(images):
             logger.info("OCR processing page %d/%d", i + 1, len(images))

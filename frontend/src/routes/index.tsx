@@ -21,9 +21,7 @@ function DashboardPage() {
 
   const documents = data?.documents ?? [];
   const totalDocs = documents.length;
-  const classified = documents.filter(
-    (d) => d.classification !== "unclassified"
-  ).length;
+  const classified = documents.filter((d) => d.classification !== "unclassified").length;
   const pending = totalDocs - classified;
 
   if (isLoading) return <LoadingSpinner />;
@@ -32,9 +30,7 @@ function DashboardPage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">
-          Document ingestion pipeline overview
-        </p>
+        <p className="text-muted-foreground mt-1">Document ingestion pipeline overview</p>
       </div>
 
       {/* Stats */}

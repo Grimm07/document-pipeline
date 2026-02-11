@@ -2,6 +2,7 @@ package org.example.pipeline.queue
 
 import com.rabbitmq.client.Connection
 import com.rabbitmq.client.ConnectionFactory
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.core.extensions.install
 import io.kotest.extensions.testcontainers.TestContainerSpecExtension
@@ -194,6 +195,55 @@ class RabbitMQPublisherTest : FunSpec({
             withTimeout(5.seconds) { allReceived.await() }
             received.toSet() shouldBe ids.toSet()
             ch.close()
+        }
+    }
+
+    context("close") {
+        fun createConnection(name: String): Connection = ConnectionFactory().apply {
+            host = rabbit.host
+            port = rabbit.amqpPort
+            username = "guest"
+            password = "guest"
+        }.newConnection(name)
+
+        test("close completes after normal usage") {
+            val conn = createConnection("close-test-normal")
+            val pub = RabbitMQPublisher(conn)
+            pub.publish(UUID.randomUUID().toString())
+            pub.close() // should not throw
+            conn.isOpen shouldBe false
+        }
+
+        test("double close does not throw") {
+            val conn = createConnection("close-test-double")
+            val pub = RabbitMQPublisher(conn)
+            pub.publish(UUID.randomUUID().toString())
+            pub.close()
+            pub.close() // runCatching absorbs the error
+        }
+
+        test("close before any publish does not throw") {
+            val conn = createConnection("close-test-nopub")
+            val pub = RabbitMQPublisher(conn)
+            pub.close() // triggers lazy channel init then immediately closes
+        }
+
+        test("publish after close throws") {
+            val conn = createConnection("close-test-afterclose")
+            val pub = RabbitMQPublisher(conn)
+            pub.publish(UUID.randomUUID().toString())
+            pub.close()
+            shouldThrow<Exception> {
+                pub.publish(UUID.randomUUID().toString())
+            }
+        }
+
+        test("close after connection already closed does not throw") {
+            val conn = createConnection("close-test-extclose")
+            val pub = RabbitMQPublisher(conn)
+            pub.publish(UUID.randomUUID().toString())
+            conn.close() // close connection externally
+            pub.close() // runCatching should absorb the error
         }
     }
 })

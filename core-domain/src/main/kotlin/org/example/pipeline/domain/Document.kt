@@ -20,6 +20,7 @@ import kotlinx.serialization.Serializable
  * @property confidence Confidence score from ML service (0.0 to 1.0), null if not yet classified
  * @property metadata Additional key-value metadata associated with the document
  * @property uploadedBy Optional identifier of the user who uploaded the document
+ * @property ocrStoragePath Relative path to stored OCR results JSON file, null if OCR not yet performed
  * @property createdAt Timestamp when the document was created
  * @property updatedAt Timestamp when the document was last updated
  */

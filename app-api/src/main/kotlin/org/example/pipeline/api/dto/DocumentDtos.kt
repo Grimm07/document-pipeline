@@ -1,11 +1,22 @@
 package org.example.pipeline.api.dto
 
-import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 import org.example.pipeline.domain.Document
 
 /**
  * Response DTO for document data.
+ *
+ * @property id Unique document identifier (UUID)
+ * @property originalFilename Original filename as uploaded by the user
+ * @property mimeType MIME type of the document
+ * @property fileSizeBytes File size in bytes
+ * @property classification ML-assigned classification label
+ * @property confidence ML confidence score (0.0-1.0), null if not yet classified
+ * @property metadata User-provided key-value metadata
+ * @property uploadedBy Optional uploader identifier
+ * @property hasOcrResults Whether OCR results are available for this document
+ * @property createdAt ISO-8601 creation timestamp
+ * @property updatedAt ISO-8601 last update timestamp
  */
 @Serializable
 data class DocumentResponse(
@@ -23,7 +34,10 @@ data class DocumentResponse(
 )
 
 /**
- * Response for document upload.
+ * Response DTO for document upload.
+ *
+ * @property id Newly created document identifier (UUID)
+ * @property message Human-readable status message
  */
 @Serializable
 data class UploadResponse(
@@ -32,7 +46,12 @@ data class UploadResponse(
 )
 
 /**
- * Response for document list.
+ * Response DTO for paginated document lists.
+ *
+ * @property documents List of document responses for the current page
+ * @property total Total number of documents returned
+ * @property limit Maximum number of results requested
+ * @property offset Number of results skipped
  */
 @Serializable
 data class DocumentListResponse(
@@ -44,6 +63,9 @@ data class DocumentListResponse(
 
 /**
  * Error response DTO.
+ *
+ * @property error Human-readable error message
+ * @property details Optional additional error details
  */
 @Serializable
 data class ErrorResponse(
@@ -52,7 +74,9 @@ data class ErrorResponse(
 )
 
 /**
- * Extension function to convert Document domain object to response DTO.
+ * Converts a [Document] domain object to its API response DTO.
+ *
+ * @return [DocumentResponse] with all fields mapped from the domain model
  */
 fun Document.toResponse(): DocumentResponse = DocumentResponse(
     id = id,

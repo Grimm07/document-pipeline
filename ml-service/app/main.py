@@ -1,3 +1,10 @@
+"""FastAPI application for document classification and OCR.
+
+Provides REST endpoints for classifying documents and extracting text
+via zero-shot classification (DeBERTa) and OCR (GOT-OCR2 + PaddleOCR).
+Models are loaded during application lifespan startup.
+"""
+
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -29,6 +36,7 @@ _models_loaded = False
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Manage application lifecycle: load ML models on startup, clean up on shutdown."""
     global _pipeline, _models_loaded
 
     os.environ.setdefault("HF_HOME", settings.hf_home)
@@ -71,6 +79,7 @@ app = FastAPI(title="ML Classification Service", lifespan=lifespan)
 
 @app.get("/health", response_model=HealthResponse)
 def health():
+    """Return service health status and model loading state."""
     return HealthResponse(
         status="healthy" if _models_loaded else "loading",
         models_loaded=_models_loaded,
@@ -81,23 +90,38 @@ def health():
 
 @app.post("/classify", response_model=ClassifyResponse)
 def classify(request: ClassifyRequest):
+    """Classify a document and return the top label with confidence score.
+
+    Args:
+        request: Document content (base64-encoded) and MIME type.
+
+    Raises:
+        HTTPException: 503 if models are still loading, 500 on inference failure.
+    """
     if not _models_loaded or _pipeline is None:
         raise HTTPException(status_code=503, detail="Models are still loading")
 
     try:
-        classification, confidence = _pipeline.classify_document(
-            request.content, request.mimeType
-        )
-        return ClassifyResponse(
-            classification=classification, confidence=confidence
-        )
-    except Exception:
+        classification, confidence = _pipeline.classify_document(request.content, request.mimeType)
+        return ClassifyResponse(classification=classification, confidence=confidence)
+    except Exception as exc:
         logger.exception("Classification failed")
-        raise HTTPException(status_code=500, detail="Classification inference failed")
+        raise HTTPException(status_code=500, detail="Classification inference failed") from exc
 
 
 @app.post("/classify-with-ocr", response_model=ClassifyWithOcrResponse)
 def classify_with_ocr(request: ClassifyRequest):
+    """Classify a document and return OCR results with bounding boxes.
+
+    For PDFs and images, extracts text via OCR and detects text region
+    bounding boxes. For text types, OCR result is None.
+
+    Args:
+        request: Document content (base64-encoded) and MIME type.
+
+    Raises:
+        HTTPException: 503 if models are still loading, 500 on inference failure.
+    """
     if not _models_loaded or _pipeline is None:
         raise HTTPException(status_code=503, detail="Models are still loading")
 
@@ -110,6 +134,6 @@ def classify_with_ocr(request: ClassifyRequest):
             confidence=confidence,
             ocr=ocr_result,
         )
-    except Exception:
+    except Exception as exc:
         logger.exception("Classification with OCR failed")
-        raise HTTPException(status_code=500, detail="Classification inference failed")
+        raise HTTPException(status_code=500, detail="Classification inference failed") from exc

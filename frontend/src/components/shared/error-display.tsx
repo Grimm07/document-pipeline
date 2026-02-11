@@ -6,10 +6,8 @@ interface ErrorDisplayProps {
   onRetry?: () => void;
 }
 
-export function ErrorDisplay({
-  message = "Something went wrong.",
-  onRetry,
-}: ErrorDisplayProps) {
+/** Displays an error message with an optional retry button. */
+export function ErrorDisplay({ message = "Something went wrong.", onRetry }: ErrorDisplayProps) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <AlertCircle className="size-12 text-destructive/60 mb-4" />

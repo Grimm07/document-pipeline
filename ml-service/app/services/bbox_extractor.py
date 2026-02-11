@@ -1,3 +1,5 @@
+"""Bounding box extraction for text regions using PaddleOCR detection."""
+
 import logging
 
 from PIL import Image
@@ -13,9 +15,11 @@ class BBoxExtractor:
     """
 
     def __init__(self) -> None:
+        """Initialize with no loaded model."""
         self._ocr = None
 
     def load(self) -> None:
+        """Load the PaddleOCR detection model (lazy import for compatibility)."""
         from paddleocr import PaddleOCR
 
         logger.info("Loading PaddleOCR detection model...")
@@ -33,6 +37,12 @@ class BBoxExtractor:
 
         Returns axis-aligned rectangles derived from PaddleOCR's 4-point polygons.
         Coordinates are in pixel space relative to the input image dimensions.
+
+        Args:
+            image: RGB PIL image to analyze.
+
+        Returns:
+            List of dicts with ``x``, ``y``, ``width``, ``height`` keys.
         """
         import numpy as np
 
@@ -46,10 +56,12 @@ class BBoxExtractor:
         for polygon in result[0]:
             xs = [p[0] for p in polygon]
             ys = [p[1] for p in polygon]
-            boxes.append({
-                "x": float(min(xs)),
-                "y": float(min(ys)),
-                "width": float(max(xs) - min(xs)),
-                "height": float(max(ys) - min(ys)),
-            })
+            boxes.append(
+                {
+                    "x": float(min(xs)),
+                    "y": float(min(ys)),
+                    "width": float(max(xs) - min(xs)),
+                    "height": float(max(ys) - min(ys)),
+                }
+            )
         return boxes

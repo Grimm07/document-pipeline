@@ -11,6 +11,9 @@ object RabbitMQConfig {
 
     private val logger = LoggerFactory.getLogger(RabbitMQConfig::class.java)
 
+    /** Interval in milliseconds between network recovery attempts. */
+    private const val NETWORK_RECOVERY_INTERVAL_MS = 5000L
+
     /**
      * Creates a RabbitMQ connection.
      *
@@ -39,7 +42,7 @@ object RabbitMQConfig {
 
             // Enable automatic recovery
             this.isAutomaticRecoveryEnabled = true
-            this.networkRecoveryInterval = 5000
+            this.networkRecoveryInterval = NETWORK_RECOVERY_INTERVAL_MS
         }
 
         return factory.newConnection("document-pipeline").also {

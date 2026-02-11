@@ -14,8 +14,6 @@ import org.slf4j.LoggerFactory
  * RabbitMQ implementation of [QueuePublisher].
  *
  * Publishes document processing messages to the classification queue.
- *
- * @property connection RabbitMQ connection
  */
 class RabbitMQPublisher(
     private val connection: Connection
@@ -59,7 +57,11 @@ class RabbitMQPublisher(
         channel.queueBind(QueueConstants.DLX_QUEUE, QueueConstants.DLX_EXCHANGE, "")
         val queueArgs = mapOf<String, Any>("x-dead-letter-exchange" to QueueConstants.DLX_EXCHANGE)
         channel.queueDeclare(QueueConstants.DOCUMENT_CLASSIFICATION_QUEUE, true, false, false, queueArgs)
-        channel.queueBind(QueueConstants.DOCUMENT_CLASSIFICATION_QUEUE, QueueConstants.DOCUMENT_EXCHANGE, QueueConstants.CLASSIFICATION_ROUTING_KEY)
+        channel.queueBind(
+            QueueConstants.DOCUMENT_CLASSIFICATION_QUEUE,
+            QueueConstants.DOCUMENT_EXCHANGE,
+            QueueConstants.CLASSIFICATION_ROUTING_KEY
+        )
         logger.info("RabbitMQ topology declared")
     }
 

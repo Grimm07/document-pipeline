@@ -12,7 +12,7 @@ describe("apiFetch", () => {
     server.use(
       http.get("/api/test", () => {
         return HttpResponse.json({ message: "hello" });
-      })
+      }),
     );
 
     const result = await apiFetch<{ message: string }>("/test");
@@ -22,11 +22,8 @@ describe("apiFetch", () => {
   it("throws ApiError with error body on 404", async () => {
     server.use(
       http.get("/api/missing", () => {
-        return HttpResponse.json(
-          { error: "Not found" },
-          { status: 404 }
-        );
-      })
+        return HttpResponse.json({ error: "Not found" }, { status: 404 });
+      }),
     );
 
     await expect(apiFetch("/missing")).rejects.toThrow(ApiError);
@@ -43,7 +40,7 @@ describe("apiFetch", () => {
     server.use(
       http.get("/api/bad", () => {
         return new HttpResponse("Internal Server Error", { status: 500 });
-      })
+      }),
     );
 
     await expect(apiFetch("/bad")).rejects.toThrow(ApiError);
@@ -53,7 +50,7 @@ describe("apiFetch", () => {
     server.use(
       http.get("/api/empty", () => {
         return new HttpResponse(null, { status: 200 });
-      })
+      }),
     );
 
     const result = await apiFetch("/empty");

@@ -17,6 +17,7 @@ interface DocumentCardProps {
   onToggleSelect?: () => void;
 }
 
+/** Card displaying a document summary with selection, classification badge, and delete action. */
 export function DocumentCard({
   document,
   selectionMode = false,
@@ -42,10 +43,7 @@ export function DocumentCard({
           <MimeTypeIcon mimeType={document.mimeType} className="size-8 shrink-0" />
         )}
         <div className="min-w-0 flex-1">
-          <p
-            className="truncate font-medium text-foreground"
-            title={document.originalFilename}
-          >
+          <p className="truncate font-medium text-foreground" title={document.originalFilename}>
             {document.originalFilename}
           </p>
           <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
@@ -56,12 +54,21 @@ export function DocumentCard({
         </div>
         <ClassificationBadge classification={document.classification} />
         {!selectionMode && (
-          <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+          <div
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+          >
             <DeleteDocumentDialog
               documentId={document.id}
               documentName={document.originalFilename}
               trigger={
-                <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-destructive">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 text-muted-foreground hover:text-destructive"
+                >
                   <Trash2 className="size-4" />
                 </Button>
               }
@@ -93,11 +100,7 @@ export function DocumentCard({
   }
 
   return (
-    <Link
-      to="/documents/$documentId"
-      params={{ documentId: document.id }}
-      className="block"
-    >
+    <Link to="/documents/$documentId" params={{ documentId: document.id }} className="block">
       {cardContent}
     </Link>
   );

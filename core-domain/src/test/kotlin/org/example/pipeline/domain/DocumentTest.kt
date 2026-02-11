@@ -2,7 +2,13 @@ package org.example.pipeline.domain
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
+import io.kotest.property.Arb
+import io.kotest.property.arbitrary.filter
+import io.kotest.property.arbitrary.float
+import io.kotest.property.arbitrary.long
+import io.kotest.property.arbitrary.string
+import io.kotest.property.arbitrary.uuid
+import io.kotest.property.forAll
 import kotlinx.datetime.Instant
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -156,6 +162,55 @@ class DocumentTest : FunSpec({
 
             original.metadata shouldBe mapOf("a" to "1")
             updated.metadata shouldBe mapOf("b" to "2")
+        }
+    }
+
+    context("property-based") {
+        test("serialization round-trip preserves all fields") {
+            forAll(
+                Arb.uuid(),
+                Arb.string(1..100),
+                Arb.string(1..100),
+                Arb.long(0L..Long.MAX_VALUE)
+            ) { uuid, filename, mimeType, fileSize ->
+                val doc = testDocument(
+                    id = uuid.toString(),
+                    storagePath = "2024/01/01/${uuid}.pdf",
+                    originalFilename = filename,
+                    mimeType = mimeType,
+                    fileSizeBytes = fileSize
+                )
+                val serialized = json.encodeToString(doc)
+                val deserialized = json.decodeFromString<Document>(serialized)
+                deserialized == doc
+            }
+        }
+
+        test("arbitrary confidence values in valid range preserved") {
+            forAll(Arb.float(0.0f, 1.0f).filter { !it.isNaN() }) { conf ->
+                val doc = testDocument(confidence = conf)
+                val serialized = json.encodeToString(doc)
+                val deserialized = json.decodeFromString<Document>(serialized)
+                deserialized.confidence == conf
+            }
+        }
+
+        test("Instant values survive round-trip") {
+            forAll(Arb.long(0L..4102444800L)) { epochSeconds ->
+                val instant = Instant.fromEpochSeconds(epochSeconds)
+                val doc = testDocument(createdAt = instant, updatedAt = instant)
+                val serialized = json.encodeToString(doc)
+                val deserialized = json.decodeFromString<Document>(serialized)
+                deserialized.createdAt == instant && deserialized.updatedAt == instant
+            }
+        }
+
+        test("copy with modified field preserves unmodified fields") {
+            forAll(Arb.uuid(), Arb.string(1..50)) { uuid, classification ->
+                val doc = testDocument(id = uuid.toString(), metadata = mapOf("key" to "value"))
+                val copied = doc.copy(classification = classification)
+                copied.id == doc.id && copied.metadata == doc.metadata && copied.classification == classification
+            }
         }
     }
 })

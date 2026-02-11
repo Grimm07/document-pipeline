@@ -11,13 +11,8 @@ const ICON_MAP: Record<string, typeof FileText> = {
   "text/csv": FileSpreadsheet,
 };
 
-export function MimeTypeIcon({
-  mimeType,
-  className,
-}: {
-  mimeType: string;
-  className?: string;
-}) {
+/** Renders a Lucide icon appropriate for the given MIME type. */
+export function MimeTypeIcon({ mimeType, className }: { mimeType: string; className?: string }) {
   const Icon = ICON_MAP[mimeType] ?? File;
   return <Icon className={cn("size-5 text-muted-foreground", className)} />;
 }

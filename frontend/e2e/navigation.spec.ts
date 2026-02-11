@@ -16,16 +16,16 @@ test.describe("Navigation", () => {
   test("navigates to upload page", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("link", { name: /upload/i }).first().click();
-    await expect(page.getByText("Upload Document")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Upload Document" })).toBeVisible();
   });
 
   test("direct URL to documents page works", async ({ page }) => {
     await page.goto("/documents");
-    await expect(page.getByText("Documents")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Documents" })).toBeVisible();
   });
 
   test("direct URL to upload page works", async ({ page }) => {
     await page.goto("/upload");
-    await expect(page.getByText("Upload Document")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Upload Document" })).toBeVisible();
   });
 });

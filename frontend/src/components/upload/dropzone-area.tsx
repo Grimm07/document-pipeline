@@ -9,11 +9,8 @@ interface DropzoneAreaProps {
   disabled?: boolean;
 }
 
-export function DropzoneArea({
-  onFileSelect,
-  selectedFile,
-  disabled,
-}: DropzoneAreaProps) {
+/** Drag-and-drop file selection area with click-to-browse fallback. */
+export function DropzoneArea({ onFileSelect, selectedFile, disabled }: DropzoneAreaProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -25,7 +22,7 @@ export function DropzoneArea({
       const file = e.dataTransfer.files[0];
       if (file) onFileSelect(file);
     },
-    [onFileSelect, disabled]
+    [onFileSelect, disabled],
   );
 
   const handleChange = useCallback(
@@ -33,7 +30,7 @@ export function DropzoneArea({
       const file = e.target.files?.[0];
       if (file) onFileSelect(file);
     },
-    [onFileSelect]
+    [onFileSelect],
   );
 
   return (
@@ -42,7 +39,7 @@ export function DropzoneArea({
         "glass-card flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition-colors",
         isDragOver && "border-primary bg-primary/5",
         !isDragOver && "border-muted-foreground/25 hover:border-muted-foreground/50",
-        disabled && "cursor-not-allowed opacity-50"
+        disabled && "cursor-not-allowed opacity-50",
       )}
       onDragOver={(e) => {
         e.preventDefault();
@@ -56,9 +53,7 @@ export function DropzoneArea({
       {selectedFile ? (
         <div className="text-center">
           <p className="font-medium">{selectedFile.name}</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Click or drag to replace
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">Click or drag to replace</p>
         </div>
       ) : (
         <div className="text-center">

@@ -25,9 +25,7 @@ export function createQueryWrapper() {
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return (
       <ThemeProvider defaultTheme="dark">
-        <QueryClientProvider client={queryClient}>
-          {children}
-        </QueryClientProvider>
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
       </ThemeProvider>
     );
   };
@@ -36,10 +34,7 @@ export function createQueryWrapper() {
 /**
  * Renders a component with both QueryClient and a minimal router for testing.
  */
-export function renderWithProviders(
-  ui: ReactElement,
-  options?: Omit<RenderOptions, "wrapper">
-) {
+export function renderWithProviders(ui: ReactElement, options?: Omit<RenderOptions, "wrapper">) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false, gcTime: 0 },

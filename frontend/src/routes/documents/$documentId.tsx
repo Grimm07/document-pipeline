@@ -21,17 +21,12 @@ export const Route = createFileRoute("/documents/$documentId")({
 function DocumentDetailPage() {
   const { documentId } = Route.useParams();
   const { data: doc, isLoading, isError, error, refetch } = useDocumentDetail(documentId);
-  const { download } = useDocumentDownload(
-    documentId,
-    doc?.originalFilename ?? "download"
-  );
+  const { download } = useDocumentDownload(documentId, doc?.originalFilename ?? "download");
   const retryMutation = useRetryClassification(documentId);
 
   if (isLoading) return <LoadingSpinner />;
   if (isError) {
-    return (
-      <ErrorDisplay message={error?.message} onRetry={() => refetch()} />
-    );
+    return <ErrorDisplay message={error?.message} onRetry={() => refetch()} />;
   }
   if (!doc) return <ErrorDisplay message="Document not found" />;
 
@@ -53,9 +48,7 @@ function DocumentDetailPage() {
           <h1 className="text-2xl font-bold tracking-tight truncate" title={doc.originalFilename}>
             {doc.originalFilename}
           </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Uploaded {formatDate(doc.createdAt)}
-          </p>
+          <p className="text-muted-foreground text-sm mt-1">Uploaded {formatDate(doc.createdAt)}</p>
         </div>
         <div className="flex items-center gap-2">
           <Button onClick={download} variant="outline">
@@ -117,16 +110,12 @@ function DocumentDetailPage() {
                 )}
               </div>
             </DetailRow>
-            <DetailRow label="Confidence">
-              {formatConfidence(doc.confidence)}
-            </DetailRow>
+            <DetailRow label="Confidence">{formatConfidence(doc.confidence)}</DetailRow>
             <Separator />
             <DetailRow label="MIME Type">{doc.mimeType}</DetailRow>
             <DetailRow label="Size">{formatFileSize(doc.fileSizeBytes)}</DetailRow>
             <DetailRow label="Updated">{formatDate(doc.updatedAt)}</DetailRow>
-            {doc.uploadedBy && (
-              <DetailRow label="Uploaded By">{doc.uploadedBy}</DetailRow>
-            )}
+            {doc.uploadedBy && <DetailRow label="Uploaded By">{doc.uploadedBy}</DetailRow>}
 
             {Object.keys(doc.metadata).length > 0 && (
               <>
@@ -162,13 +151,7 @@ function DocumentDetailPage() {
   );
 }
 
-function DetailRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex justify-between gap-2 text-sm">
       <span className="text-muted-foreground shrink-0">{label}</span>

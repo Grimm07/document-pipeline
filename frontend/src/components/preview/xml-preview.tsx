@@ -7,6 +7,7 @@ interface XmlPreviewProps {
   documentId: string;
 }
 
+/** Syntax-highlighted XML document preview with dark mode support. */
 export function XmlPreview({ documentId }: XmlPreviewProps) {
   const [xml, setXml] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -47,9 +48,16 @@ export function XmlPreview({ documentId }: XmlPreviewProps) {
     );
   }
 
-  const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const isDark =
+    theme === "dark" ||
+    (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
   const customTheme = isDark
-    ? { tagColor: "#7dd3fc", attributeKeyColor: "#c084fc", attributeValueColor: "#86efac", textColor: "#e2e8f0" }
+    ? {
+        tagColor: "#7dd3fc",
+        attributeKeyColor: "#c084fc",
+        attributeValueColor: "#86efac",
+        textColor: "#e2e8f0",
+      }
     : undefined;
 
   return (

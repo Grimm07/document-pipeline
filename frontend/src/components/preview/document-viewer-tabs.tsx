@@ -10,6 +10,7 @@ interface DocumentViewerTabsProps {
   hasOcrResults: boolean;
 }
 
+/** Tabbed viewer with Preview, OCR Text, and Bounding Boxes tabs when OCR results exist. */
 export function DocumentViewerTabs({
   documentId,
   mimeType,
@@ -17,13 +18,7 @@ export function DocumentViewerTabs({
   hasOcrResults,
 }: DocumentViewerTabsProps) {
   if (!hasOcrResults) {
-    return (
-      <DocumentPreview
-        documentId={documentId}
-        mimeType={mimeType}
-        filename={filename}
-      />
-    );
+    return <DocumentPreview documentId={documentId} mimeType={mimeType} filename={filename} />;
   }
 
   return (
@@ -34,11 +29,7 @@ export function DocumentViewerTabs({
         <TabsTrigger value="bboxes">Bounding Boxes</TabsTrigger>
       </TabsList>
       <TabsContent value="preview">
-        <DocumentPreview
-          documentId={documentId}
-          mimeType={mimeType}
-          filename={filename}
-        />
+        <DocumentPreview documentId={documentId} mimeType={mimeType} filename={filename} />
       </TabsContent>
       <TabsContent value="ocr-text">
         <OcrTextViewer documentId={documentId} />

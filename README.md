@@ -92,6 +92,7 @@ curl localhost:15672                      # RabbitMQ management UI
 | `ml-service/` | Python FastAPI — zero-shot classification, OCR, bounding box detection |
 | `scripts/` | Dev environment management (`dev.sh`) |
 | `docker/` | Docker Compose for PostgreSQL, RabbitMQ, and ML service |
+| `config/detekt/` | Detekt linter configuration for Kotlin modules |
 
 ## API Endpoints
 
@@ -133,11 +134,11 @@ For CPU-only mode, set `ML_DEVICE=cpu` and `ML_TORCH_DTYPE=float32` in the envir
 
 ## Tech Stack
 
-**Backend** — Kotlin 2.2, JVM 21, Gradle (Kotlin DSL) with version catalog, Ktor 3.2 (Netty), kotlinx.serialization, Koin DI, Exposed DSL, Flyway, HikariCP, RabbitMQ (amqp-client), Kotlin Coroutines, SLF4J + Logback, HOCON config
+**Backend** — Kotlin 2.2, JVM 21, Gradle (Kotlin DSL) with version catalog, Ktor 3.2 (Netty), kotlinx.serialization, Koin DI, Exposed DSL, Flyway, HikariCP, RabbitMQ (amqp-client), Kotlin Coroutines, SLF4J + Logback, HOCON config, **Detekt** (linting)
 
-**Frontend** — React 19, TypeScript 5, Vite 6, TanStack Router + Query + Form, Tailwind CSS v4, shadcn/ui, pdfjs-dist, openseadragon, Vitest + React Testing Library + MSW, Playwright
+**Frontend** — React 19, TypeScript 5, Vite 6, TanStack Router + Query + Form, Tailwind CSS v4, shadcn/ui, pdfjs-dist, openseadragon, Vitest + React Testing Library + MSW, Playwright, **ESLint 9** + **Prettier** (linting/formatting)
 
-**ML Service** — Python 3.12, FastAPI, Uvicorn, Transformers, PyTorch, PaddleOCR, PyMuPDF, Pydantic Settings
+**ML Service** — Python 3.12, FastAPI, Uvicorn, Transformers, PyTorch, PaddleOCR, PyMuPDF, Pydantic Settings, **Ruff** (linting/formatting)
 
 **Infrastructure** — PostgreSQL 16, RabbitMQ 4, Docker Compose, NVIDIA CUDA 12.6 (optional)
 
@@ -149,7 +150,7 @@ For CPU-only mode, set `ML_DEVICE=cpu` and `ML_TORCH_DTYPE=float32` in the envir
 ./gradlew :infra-db:test               # Single module (infra-db and infra-queue need Docker)
 
 # Frontend — Vitest + React Testing Library + MSW
-cd frontend && npm test                # 73 tests across 19 files
+cd frontend && npm test                # 90 tests across 22 files
 
 # Frontend E2E — Playwright (requires running backend)
 cd frontend && npm run test:e2e
@@ -160,6 +161,30 @@ cd ml-service && pip install -e ".[dev]" && pytest tests/ -v
 # ML service GPU integration tests (requires CUDA GPU + downloaded models)
 cd ml-service && pytest -m gpu -v
 ```
+
+## Linting
+
+All three stacks have linters that enforce documentation, style, complexity, and bug detection. Linters fail the build when violations are found.
+
+```bash
+# Kotlin — Detekt (also runs as part of ./gradlew build)
+./gradlew detekt
+
+# Python — Ruff (lint + format)
+cd ml-service && ruff check app/ && ruff format --check app/
+
+# TypeScript — ESLint + Prettier
+cd frontend && npm run lint            # ESLint + type-check
+cd frontend && npm run format:check    # Prettier format check
+```
+
+| Stack | Tool | Config | Enforces |
+|---|---|---|---|
+| Kotlin | Detekt 1.23.8 | `config/detekt/detekt.yml` | KDoc on public APIs, complexity limits, unused code, magic numbers, style |
+| Python | Ruff | `ml-service/pyproject.toml` | Google-style docstrings, import sorting, bug patterns, modern Python |
+| TypeScript | ESLint 9 + Prettier | `frontend/eslint.config.js` + `.prettierrc` | JSDoc on exports, React hooks rules, consistent formatting |
+
+Test files are excluded from documentation rules across all stacks. Auto-fix commands: `./gradlew detekt` (reports only), `cd ml-service && ruff check --fix app/ && ruff format app/`, `cd frontend && npm run lint:fix && npm run format`.
 
 ## Configuration
 
@@ -181,10 +206,10 @@ ML service uses `ML_`-prefixed env vars: `ML_DEVICE`, `ML_TORCH_DTYPE`, `ML_HF_H
 
 | Pass | Focus | Status |
 |---|---|---|
-| 1 | Security hardening | Implemented |
-| 2 | Document viewers + OCR pipeline | Implemented |
-| 3 | Test coverage gaps (E2E, integration, error paths) | Planned |
-| 4 | Documentation & code quality (KDoc, error consistency) | Planned |
+| 1 | Security hardening | Done |
+| 2 | Document viewers + OCR pipeline | Done |
+| 3 | Test coverage gaps (E2E, integration, error paths) | Done |
+| 4 | Documentation & code quality (Detekt, Ruff, ESLint, KDoc, docstrings, JSDoc) | Done |
 | 5 | Build & DevEx (Gradle config cache, Docker health checks) | Planned |
 | 6 | Observability & logging (Prometheus metrics, correlation IDs) | Planned |
 | 7 | Model explainability (per-label scores, attention attribution) | Planned |

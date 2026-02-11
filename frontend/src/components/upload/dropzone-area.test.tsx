@@ -5,9 +5,7 @@ import { DropzoneArea } from "./dropzone-area";
 describe("DropzoneArea", () => {
   it("renders default dropzone text", () => {
     render(<DropzoneArea onFileSelect={vi.fn()} selectedFile={null} />);
-    expect(
-      screen.getByText("Drop a file here or click to browse")
-    ).toBeInTheDocument();
+    expect(screen.getByText("Drop a file here or click to browse")).toBeInTheDocument();
   });
 
   it("shows selected file name", () => {
@@ -22,8 +20,7 @@ describe("DropzoneArea", () => {
     const onFileSelect = vi.fn();
     render(<DropzoneArea onFileSelect={onFileSelect} selectedFile={null} />);
 
-    const dropzone = screen.getByText("Drop a file here or click to browse")
-      .closest("div")!;
+    const dropzone = screen.getByText("Drop a file here or click to browse").closest("div")!;
 
     const file = new File(["test"], "test.pdf", { type: "application/pdf" });
     fireEvent.drop(dropzone, {
@@ -46,9 +43,7 @@ describe("DropzoneArea", () => {
   });
 
   it("is disabled when disabled prop is true", () => {
-    render(
-      <DropzoneArea onFileSelect={vi.fn()} selectedFile={null} disabled />
-    );
+    render(<DropzoneArea onFileSelect={vi.fn()} selectedFile={null} disabled />);
 
     const dropzone = screen
       .getByText("Drop a file here or click to browse")

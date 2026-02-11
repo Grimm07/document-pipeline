@@ -5,6 +5,7 @@ interface ImagePreviewProps {
   filename: string;
 }
 
+/** Displays a responsive image preview fetched from the document download endpoint. */
 export function ImagePreview({ documentId, filename }: ImagePreviewProps) {
   return (
     <div className="flex items-center justify-center rounded-lg border bg-muted/30 p-4">

@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 test.describe("Upload Page", () => {
   test("shows upload form", async ({ page }) => {
     await page.goto("/upload");
-    await expect(page.getByText("Upload Document")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Upload Document" })).toBeVisible();
     await expect(
       page.getByText("Drop a file here or click to browse")
     ).toBeVisible();
@@ -11,8 +11,8 @@ test.describe("Upload Page", () => {
 
   test("shows metadata field controls", async ({ page }) => {
     await page.goto("/upload");
-    await expect(page.getByText("Metadata")).toBeVisible();
-    await expect(page.getByText("Add Field")).toBeVisible();
+    await expect(page.getByText("Metadata", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add Field" })).toBeVisible();
   });
 
   test("upload button is disabled without file", async ({ page }) => {
@@ -24,7 +24,7 @@ test.describe("Upload Page", () => {
   test("can add and remove metadata fields", async ({ page }) => {
     await page.goto("/upload");
 
-    await page.getByText("Add Field").click();
+    await page.getByRole("button", { name: "Add Field" }).click();
     const inputs = page.getByRole("textbox");
     await expect(inputs).toHaveCount(2); // key + value
 

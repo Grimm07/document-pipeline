@@ -8,6 +8,7 @@ interface JsonPreviewProps {
   documentId: string;
 }
 
+/** Interactive JSON tree viewer that fetches and renders a document as collapsible JSON. */
 export function JsonPreview({ documentId }: JsonPreviewProps) {
   const [data, setData] = useState<object | unknown[]>(null as unknown as object);
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +49,9 @@ export function JsonPreview({ documentId }: JsonPreviewProps) {
     );
   }
 
-  const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const isDark =
+    theme === "dark" ||
+    (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
 
   return (
     <div className="max-h-[600px] overflow-auto rounded-lg border p-4">

@@ -9,9 +9,7 @@ const CLASSIFICATION_COLORS: Record<string, string> = {
   unclassified: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400",
 };
 
+/** Returns Tailwind CSS classes for a document classification label's badge color. */
 export function getClassificationColor(classification: string): string {
-  return (
-    CLASSIFICATION_COLORS[classification.toLowerCase()] ??
-    CLASSIFICATION_COLORS["other"]!
-  );
+  return CLASSIFICATION_COLORS[classification.toLowerCase()] ?? CLASSIFICATION_COLORS["other"]!;
 }

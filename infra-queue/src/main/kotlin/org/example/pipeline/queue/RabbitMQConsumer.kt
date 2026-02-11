@@ -1,7 +1,11 @@
 package org.example.pipeline.queue
 
 import com.rabbitmq.client.*
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 
@@ -9,9 +13,6 @@ import org.slf4j.LoggerFactory
  * RabbitMQ consumer for document processing messages.
  *
  * Listens on the classification queue and dispatches messages to a handler.
- *
- * @property connection RabbitMQ connection
- * @property messageHandler Callback invoked for each received document ID (as string)
  */
 class RabbitMQConsumer(
     private val connection: Connection,
@@ -30,39 +31,41 @@ class RabbitMQConsumer(
      * Messages are acknowledged after successful processing.
      * Failed messages are nack'd and sent to the dead letter queue.
      */
+    @Suppress("TooGenericExceptionCaught") // RabbitMQ handlers must catch all to nack
     fun start() {
-        channel = connection.createChannel().also { declareTopology(it) }
-        channel!!.basicQos(1)
+        val ch = connection.createChannel().also { declareTopology(it) }
+        channel = ch
+        ch.basicQos(1)
 
         val deliverCallback = DeliverCallback { _, delivery ->
             val body = String(delivery.body)
             val docMessage = try {
                 json.decodeFromString<DocumentMessage>(body)
-            } catch (e: Exception) {
-                logger.error("Failed to parse message, nacking: {}", body.take(200), e)
-                channel!!.basicNack(delivery.envelope.deliveryTag, false, false)
+            } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                logger.error("Failed to parse message, nacking: {}", body.take(MAX_LOG_BODY_LENGTH), e)
+                ch.basicNack(delivery.envelope.deliveryTag, false, false)
                 return@DeliverCallback
             }
             scope.launch {
                 try {
                     messageHandler(docMessage.documentId)
-                    channel!!.basicAck(delivery.envelope.deliveryTag, false)
+                    ch.basicAck(delivery.envelope.deliveryTag, false)
                 } catch (e: Exception) {
                     val requeue = !delivery.envelope.isRedeliver
                     logger.error(
                         "Failed to process message: {} (requeue={})",
                         docMessage.documentId, requeue, e
                     )
-                    channel!!.basicNack(delivery.envelope.deliveryTag, false, requeue)
+                    ch.basicNack(delivery.envelope.deliveryTag, false, requeue)
                 }
             }
         }
 
-        consumerTag = channel!!.basicConsume(
+        consumerTag = ch.basicConsume(
             QueueConstants.DOCUMENT_CLASSIFICATION_QUEUE,
             false,
             deliverCallback,
-            CancelCallback { tag -> logger.warn("Consumer $tag cancelled by broker") }
+            CancelCallback { tag -> logger.warn("Consumer {} cancelled by broker", tag) }
         )
         logger.info("RabbitMQ consumer started with tag: {}", consumerTag)
     }
@@ -90,9 +93,21 @@ class RabbitMQConsumer(
         channel.exchangeDeclare(QueueConstants.DLX_EXCHANGE, "fanout", true)
         channel.queueDeclare(QueueConstants.DLX_QUEUE, true, false, false, null)
         channel.queueBind(QueueConstants.DLX_QUEUE, QueueConstants.DLX_EXCHANGE, "")
-        val queueArgs = mapOf<String, Any>("x-dead-letter-exchange" to QueueConstants.DLX_EXCHANGE)
-        channel.queueDeclare(QueueConstants.DOCUMENT_CLASSIFICATION_QUEUE, true, false, false, queueArgs)
-        channel.queueBind(QueueConstants.DOCUMENT_CLASSIFICATION_QUEUE, QueueConstants.DOCUMENT_EXCHANGE, QueueConstants.CLASSIFICATION_ROUTING_KEY)
+        val queueArgs = mapOf<String, Any>(
+            "x-dead-letter-exchange" to QueueConstants.DLX_EXCHANGE
+        )
+        channel.queueDeclare(
+            QueueConstants.DOCUMENT_CLASSIFICATION_QUEUE, true, false, false, queueArgs
+        )
+        channel.queueBind(
+            QueueConstants.DOCUMENT_CLASSIFICATION_QUEUE,
+            QueueConstants.DOCUMENT_EXCHANGE,
+            QueueConstants.CLASSIFICATION_ROUTING_KEY
+        )
         logger.info("RabbitMQ topology declared (consumer)")
+    }
+
+    private companion object {
+        const val MAX_LOG_BODY_LENGTH = 200
     }
 }

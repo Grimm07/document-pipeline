@@ -21,7 +21,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.Json
-import org.example.pipeline.api.dto.toResponse
 import org.example.pipeline.domain.Document
 import org.example.pipeline.domain.DocumentRepository
 import org.example.pipeline.domain.FileStorageService

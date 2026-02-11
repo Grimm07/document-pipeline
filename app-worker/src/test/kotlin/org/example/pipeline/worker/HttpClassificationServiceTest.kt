@@ -2,8 +2,6 @@ package org.example.pipeline.worker
 
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
-import io.kotest.matchers.floats.shouldBeGreaterThanOrEqual
-import io.kotest.matchers.floats.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
@@ -225,6 +223,36 @@ class HttpClassificationServiceTest : FunSpec({
         test("present ocr field is serialized to ocrResultJson string") {
             responseOcrJson = """{"pages":[{"pageIndex":0,"width":100,"height":200,"text":"hello","blocks":[]}],"fullText":"hello"}"""
             val result = service.classify("hello".toByteArray(), "application/pdf")
+            result.ocrResultJson shouldBe responseOcrJson
+        }
+    }
+
+    context("additional error cases") {
+        test("throws on HTTP 503 Service Unavailable") {
+            shouldFail = true
+            failStatusCode = HttpStatusCode.ServiceUnavailable
+
+            shouldThrow<Exception> {
+                service.classify("data".toByteArray(), "application/pdf")
+            }
+        }
+    }
+
+    context("OCR response edge cases") {
+        test("empty OCR pages array preserved in ocrResultJson") {
+            responseOcrJson = """{"pages":[],"fullText":""}"""
+            val result = service.classify("hello".toByteArray(), "application/pdf")
+            result.ocrResultJson shouldBe responseOcrJson
+        }
+
+        test("handles OCR response with many pages") {
+            // Build a response with 50 pages
+            val pages = (0 until 50).joinToString(",") { i ->
+                """{"pageIndex":$i,"width":612,"height":792,"text":"Page $i text","blocks":[]}"""
+            }
+            responseOcrJson = """{"pages":[$pages],"fullText":"All pages text"}"""
+            val result = service.classify("hello".toByteArray(), "application/pdf")
+            // Verify the full JSON was preserved
             result.ocrResultJson shouldBe responseOcrJson
         }
     }

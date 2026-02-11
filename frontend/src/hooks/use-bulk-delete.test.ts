@@ -75,7 +75,7 @@ describe("useBulkDelete", () => {
       http.delete("/api/documents/:id", async () => {
         await new Promise((r) => setTimeout(r, 100));
         return new HttpResponse(null, { status: 204 });
-      })
+      }),
     );
 
     const { result } = renderHook(() => useBulkDelete(onComplete), {

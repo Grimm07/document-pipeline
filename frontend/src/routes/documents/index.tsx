@@ -59,9 +59,7 @@ function DocumentListPage() {
     } else if (result.successCount === 0) {
       setDeleteStatus(`Failed to delete all ${result.failureCount} documents.`);
     } else {
-      setDeleteStatus(
-        `Deleted ${result.successCount}, failed ${result.failureCount}.`
-      );
+      setDeleteStatus(`Deleted ${result.successCount}, failed ${result.failureCount}.`);
       deselectAll();
     }
   }
@@ -84,9 +82,7 @@ function DocumentListPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Documents</h1>
-          <p className="text-muted-foreground mt-1">
-            Browse and filter uploaded documents
-          </p>
+          <p className="text-muted-foreground mt-1">Browse and filter uploaded documents</p>
         </div>
 
         {/* Selection toolbar */}
@@ -123,22 +119,13 @@ function DocumentListPage() {
                   }}
                   isPending={isDeleting}
                 />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={exitSelectionMode}
-                  disabled={isDeleting}
-                >
+                <Button variant="ghost" size="sm" onClick={exitSelectionMode} disabled={isDeleting}>
                   <X className="size-4 mr-1" />
                   Cancel
                 </Button>
               </>
             ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={enterSelectionMode}
-              >
+              <Button variant="outline" size="sm" onClick={enterSelectionMode}>
                 <CheckSquare className="size-4 mr-1.5" />
                 Select
               </Button>
@@ -190,11 +177,7 @@ function DocumentListPage() {
       ) : documents.length === 0 ? (
         <EmptyState
           title={classification ? `No ${classification} documents` : undefined}
-          description={
-            classification
-              ? "Try selecting a different classification."
-              : undefined
-          }
+          description={classification ? "Try selecting a different classification." : undefined}
         />
       ) : (
         <div className="grid gap-3">
@@ -213,11 +196,7 @@ function DocumentListPage() {
       {/* Load More */}
       {hasNextPage && (
         <div className="flex justify-center pt-4">
-          <Button
-            variant="outline"
-            onClick={() => fetchNextPage()}
-            disabled={isFetchingNextPage}
-          >
+          <Button variant="outline" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
             {isFetchingNextPage ? "Loading..." : "Load More"}
           </Button>
         </div>

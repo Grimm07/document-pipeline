@@ -2,7 +2,6 @@ package org.example.pipeline.storage
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.number
 import kotlinx.datetime.toLocalDateTime
@@ -16,9 +15,7 @@ import kotlin.io.path.*
  * Local filesystem implementation of [FileStorageService].
  *
  * Organizes files in a date-based directory structure:
- * {baseDir}/{yyyy}/{MM}/{dd}/{uuid}.{ext}
- *
- * @property baseDir The root directory for file storage
+ * `{baseDir}/{yyyy}/{MM}/{dd}/{uuid}.{ext}`
  */
 class LocalFileStorageService(
     private val baseDir: Path

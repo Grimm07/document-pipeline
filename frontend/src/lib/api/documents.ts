@@ -6,8 +6,9 @@ import type {
 } from "@/types/api";
 import { apiFetch } from "./client";
 
+/** Fetches a paginated list of documents, optionally filtered by classification. */
 export async function fetchDocuments(
-  filters: DocumentListFilters = {}
+  filters: DocumentListFilters = {},
 ): Promise<DocumentListResponse> {
   const params = new URLSearchParams();
   if (filters.classification) params.set("classification", filters.classification);
@@ -18,13 +19,15 @@ export async function fetchDocuments(
   return apiFetch<DocumentListResponse>(`/documents${qs ? `?${qs}` : ""}`);
 }
 
+/** Fetches a single document by ID. */
 export async function fetchDocument(id: string): Promise<DocumentResponse> {
   return apiFetch<DocumentResponse>(`/documents/${id}`);
 }
 
+/** Searches documents by metadata key-value pairs. */
 export async function searchDocuments(
   metadata: Record<string, string>,
-  limit?: number
+  limit?: number,
 ): Promise<DocumentListResponse> {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(metadata)) {
@@ -34,18 +37,22 @@ export async function searchDocuments(
   return apiFetch<DocumentListResponse>(`/documents/search?${params.toString()}`);
 }
 
+/** Returns the download URL for a document's file content. */
 export function getDocumentDownloadUrl(id: string): string {
   return `/api/documents/${id}/download`;
 }
 
+/** Fetches OCR results for a document. */
 export async function fetchOcrResults(id: string): Promise<OcrResult> {
   return apiFetch<OcrResult>(`/documents/${id}/ocr`);
 }
 
+/** Deletes a document and its associated files. */
 export async function deleteDocument(id: string): Promise<void> {
   await apiFetch<void>(`/documents/${id}`, { method: "DELETE" });
 }
 
+/** Retries classification for a document that failed or timed out. */
 export async function retryClassification(id: string): Promise<DocumentResponse> {
   return apiFetch<DocumentResponse>(`/documents/${id}/retry`, { method: "POST" });
 }
@@ -57,7 +64,7 @@ export async function retryClassification(id: string): Promise<DocumentResponse>
 export function uploadDocument(
   file: File,
   metadata: Record<string, string>,
-  onProgress?: (percent: number) => void
+  onProgress?: (percent: number) => void,
 ): Promise<DocumentResponse> {
   return new Promise((resolve, reject) => {
     const formData = new FormData();

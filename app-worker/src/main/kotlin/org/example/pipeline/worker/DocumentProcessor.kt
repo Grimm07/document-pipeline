@@ -13,10 +13,6 @@ import org.slf4j.LoggerFactory
  * 2. Retrieve file content from storage
  * 3. Call ML classification service
  * 4. Update document with classification result
- *
- * @property documentRepository Repository for document persistence
- * @property fileStorageService Service for file retrieval
- * @property classificationService Service for ML classification
  */
 class DocumentProcessor(
     private val documentRepository: DocumentRepository,
@@ -41,7 +37,7 @@ class DocumentProcessor(
         }
 
         val content = fileStorageService.retrieve(document.storagePath)
-            ?: throw IllegalStateException("File content not found for document $documentId at ${document.storagePath}")
+        checkNotNull(content) { "File content not found for document $documentId at ${document.storagePath}" }
 
         val result = classificationService.classify(content, document.mimeType)
 

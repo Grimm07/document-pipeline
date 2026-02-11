@@ -158,7 +158,7 @@ class ExposedDocumentRepositoryTest : FunSpec({
         test("respects offset") {
             repeat(5) { repo.insert(testDocument()) }
 
-            val all = repo.list()
+            repo.list()
             val offset = repo.list(offset = 2)
             offset shouldHaveSize 3
         }

@@ -1,8 +1,6 @@
 import type { DocumentResponse, DocumentListResponse, OcrResult } from "@/types/api";
 
-export function createMockDocument(
-  overrides: Partial<DocumentResponse> = {}
-): DocumentResponse {
+export function createMockDocument(overrides: Partial<DocumentResponse> = {}): DocumentResponse {
   return {
     id: "test-doc-001",
     originalFilename: "report.pdf",
@@ -21,14 +19,14 @@ export function createMockDocument(
 
 export function createMockDocumentList(
   count: number = 3,
-  overrides: Partial<DocumentResponse> = {}
+  overrides: Partial<DocumentResponse> = {},
 ): DocumentListResponse {
   const documents = Array.from({ length: count }, (_, i) =>
     createMockDocument({
       id: `test-doc-${String(i + 1).padStart(3, "0")}`,
       originalFilename: `document-${i + 1}.pdf`,
       ...overrides,
-    })
+    }),
   );
 
   return {

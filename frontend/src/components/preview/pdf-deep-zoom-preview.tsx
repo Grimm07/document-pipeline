@@ -12,6 +12,7 @@ interface PdfDeepZoomPreviewProps {
   documentId: string;
 }
 
+/** PDF viewer with deep zoom and pan using OpenSeadragon and pdf.js. */
 export function PdfDeepZoomPreview({ documentId }: PdfDeepZoomPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<OpenSeadragon.Viewer | null>(null);
@@ -44,7 +45,7 @@ export function PdfDeepZoomPreview({ documentId }: PdfDeepZoomPreviewProps) {
         type: "image",
         url: dataUrl,
       });
-    } catch (err) {
+    } catch {
       setError("Failed to render page");
     }
   }, []);
@@ -124,7 +125,7 @@ export function PdfDeepZoomPreview({ documentId }: PdfDeepZoomPreviewProps) {
       setCurrentPage(page);
       renderPage(page);
     },
-    [pageCount, renderPage]
+    [pageCount, renderPage],
   );
 
   if (error) {

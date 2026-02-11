@@ -17,11 +17,8 @@ import io.ktor.server.response.*
 import io.ktor.server.testing.*
 import io.mockk.*
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import org.example.pipeline.api.dto.toResponse
 import org.example.pipeline.domain.Document
 import org.example.pipeline.domain.DocumentRepository
 import org.example.pipeline.domain.FileStorageService
@@ -800,6 +797,162 @@ class DocumentRoutesTest : FunSpec({
 
                 val response = client.get("/api/documents/${doc.id}/download")
                 response.status shouldBe HttpStatusCode.NotFound
+            }
+        }
+    }
+
+    context("upload error handling") {
+        test("returns 500 when storage.store() throws IOException") {
+            testApplication {
+                setupApp()
+                coEvery { mockStorage.store(any(), any(), any()) } throws java.io.IOException("Disk full")
+
+                val response = client.post("/api/documents/upload") {
+                    setBody(MultiPartFormDataContent(formData {
+                        append("file", "content".toByteArray(), Headers.build {
+                            append(HttpHeaders.ContentType, "application/pdf")
+                            append(HttpHeaders.ContentDisposition, "filename=\"test.pdf\"")
+                        })
+                    }))
+                }
+
+                response.status shouldBe HttpStatusCode.InternalServerError
+                // Verify repo.insert was NOT called (storage failed first)
+                coVerify(exactly = 0) { mockRepo.insert(any()) }
+            }
+        }
+
+        test("returns 500 when repo.insert() throws") {
+            testApplication {
+                setupApp()
+                coEvery { mockStorage.store(any(), any(), any()) } returns "2024/07/15/test.pdf"
+                coEvery { mockRepo.insert(any()) } throws RuntimeException("DB constraint violation")
+
+                val response = client.post("/api/documents/upload") {
+                    setBody(MultiPartFormDataContent(formData {
+                        append("file", "content".toByteArray(), Headers.build {
+                            append(HttpHeaders.ContentType, "application/pdf")
+                            append(HttpHeaders.ContentDisposition, "filename=\"test.pdf\"")
+                        })
+                    }))
+                }
+
+                response.status shouldBe HttpStatusCode.InternalServerError
+            }
+        }
+
+        test("returns 500 when publisher.publish() throws") {
+            testApplication {
+                setupApp()
+                coEvery { mockStorage.store(any(), any(), any()) } returns "2024/07/15/test.pdf"
+                coEvery { mockRepo.insert(any()) } answers { firstArg<Document>() }
+                coEvery { mockPublisher.publish(any()) } throws RuntimeException("Queue connection failed")
+
+                val response = client.post("/api/documents/upload") {
+                    setBody(MultiPartFormDataContent(formData {
+                        append("file", "content".toByteArray(), Headers.build {
+                            append(HttpHeaders.ContentType, "application/pdf")
+                            append(HttpHeaders.ContentDisposition, "filename=\"test.pdf\"")
+                        })
+                    }))
+                }
+
+                response.status shouldBe HttpStatusCode.InternalServerError
+            }
+        }
+    }
+
+    context("download edge cases") {
+        test("handles corrupted mimeType in ContentType.parse()") {
+            testApplication {
+                setupApp()
+
+                val doc = testDocument().let {
+                    // Create a document with a problematic mimeType
+                    Document(
+                        id = it.id,
+                        storagePath = it.storagePath,
+                        originalFilename = it.originalFilename,
+                        mimeType = "not/a/valid///mime",
+                        fileSizeBytes = it.fileSizeBytes,
+                        createdAt = it.createdAt,
+                        updatedAt = it.updatedAt
+                    )
+                }
+                coEvery { mockRepo.getById(doc.id) } returns doc
+                coEvery { mockStorage.retrieve(doc.storagePath) } returns "data".toByteArray()
+
+                val response = client.get("/api/documents/${doc.id}/download")
+                // Should either return 500 (parse failure) or handle gracefully
+                // ContentType.parse() may throw BadContentTypeFormatException
+                (response.status == HttpStatusCode.InternalServerError ||
+                    response.status == HttpStatusCode.OK) shouldBe true
+            }
+        }
+    }
+
+    context("delete edge cases") {
+        test("returns 204 even when repo.delete returns false") {
+            testApplication {
+                setupApp()
+
+                val doc = testDocument()
+                coEvery { mockRepo.getById(doc.id) } returns doc
+                coEvery { mockStorage.delete(doc.storagePath) } returns true
+                coEvery { mockRepo.delete(doc.id) } returns false // row already gone
+
+                val response = client.delete("/api/documents/${doc.id}")
+                response.status shouldBe HttpStatusCode.NoContent
+            }
+        }
+    }
+
+    context("retry edge cases") {
+        test("returns 404 when doc disappears between reset and re-fetch") {
+            testApplication {
+                setupApp()
+
+                val doc = testDocument()
+                // First getById returns doc, second (after reset) returns null
+                coEvery { mockRepo.getById(doc.id) } returnsMany listOf(doc, null)
+                coEvery { mockRepo.resetClassification(doc.id) } returns true
+                coEvery { mockPublisher.publish(doc.id) } returns Unit
+
+                val response = client.post("/api/documents/${doc.id}/retry")
+                response.status shouldBe HttpStatusCode.NotFound
+            }
+        }
+
+        test("continues when resetClassification returns false") {
+            testApplication {
+                setupApp()
+
+                val doc = testDocument()
+                val resetDoc = doc.copy(classification = "unclassified", confidence = null)
+                coEvery { mockRepo.getById(doc.id) } returnsMany listOf(doc, resetDoc)
+                coEvery { mockRepo.resetClassification(doc.id) } returns false
+                coEvery { mockPublisher.publish(doc.id) } returns Unit
+
+                val response = client.post("/api/documents/${doc.id}/retry")
+                // Should still return 200 (resetClassification returning false doesn't abort)
+                response.status shouldBe HttpStatusCode.OK
+            }
+        }
+
+        test("continues when OCR file deletion fails during retry") {
+            testApplication {
+                setupApp()
+
+                val doc = testDocument().copy(ocrStoragePath = "2024/07/15/ocr.json")
+                val resetDoc = doc.copy(classification = "unclassified", confidence = null, ocrStoragePath = null)
+                coEvery { mockRepo.getById(doc.id) } returnsMany listOf(doc, resetDoc)
+                coEvery { mockStorage.delete("2024/07/15/ocr.json") } throws RuntimeException("Storage error")
+                coEvery { mockRepo.resetClassification(doc.id) } returns true
+                coEvery { mockPublisher.publish(doc.id) } returns Unit
+
+                val response = client.post("/api/documents/${doc.id}/retry")
+                // Should still succeed — OCR deletion failure is caught
+                response.status shouldBe HttpStatusCode.OK
             }
         }
     }

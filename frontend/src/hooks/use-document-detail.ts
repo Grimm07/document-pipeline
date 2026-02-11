@@ -1,11 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchDocument } from "@/lib/api/documents";
 import { documentKeys } from "@/lib/query-keys";
-import {
-  CLASSIFICATION_POLL_INTERVAL,
-  CLASSIFICATION_POLL_TIMEOUT,
-} from "@/lib/constants";
+import { CLASSIFICATION_POLL_INTERVAL, CLASSIFICATION_POLL_TIMEOUT } from "@/lib/constants";
 
+/** Hook that fetches a document and polls for classification updates while unclassified. */
 export function useDocumentDetail(id: string) {
   return useQuery({
     queryKey: documentKeys.detail(id),

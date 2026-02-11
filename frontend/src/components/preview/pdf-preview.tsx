@@ -5,6 +5,7 @@ interface PdfPreviewProps {
   documentId: string;
 }
 
+/** Simple PDF preview using a browser iframe with blob URL. */
 export function PdfPreview({ documentId }: PdfPreviewProps) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
@@ -33,10 +34,6 @@ export function PdfPreview({ documentId }: PdfPreviewProps) {
   }
 
   return (
-    <iframe
-      src={blobUrl}
-      className="h-[600px] w-full rounded-lg border"
-      title="PDF Preview"
-    />
+    <iframe src={blobUrl} className="h-[600px] w-full rounded-lg border" title="PDF Preview" />
   );
 }

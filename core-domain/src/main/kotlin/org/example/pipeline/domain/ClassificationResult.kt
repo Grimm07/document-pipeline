@@ -7,6 +7,7 @@ import kotlinx.serialization.Serializable
  *
  * @property classification The predicted document classification/category
  * @property confidence Confidence score between 0.0 and 1.0
+ * @property ocrResultJson Raw OCR result JSON from the ML service, null if OCR was not performed
  */
 @Serializable
 data class ClassificationResult(

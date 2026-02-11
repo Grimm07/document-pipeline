@@ -30,7 +30,7 @@ function UploadPage() {
     }
     if (f.size > MAX_FILE_SIZE) {
       setValidationError(
-        `File too large (${formatFileSize(f.size)}). Maximum is ${formatFileSize(MAX_FILE_SIZE)}.`
+        `File too large (${formatFileSize(f.size)}). Maximum is ${formatFileSize(MAX_FILE_SIZE)}.`,
       );
       return;
     }
@@ -58,9 +58,7 @@ function UploadPage() {
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Upload Document</h1>
-        <p className="text-muted-foreground mt-1">
-          Upload a document for classification
-        </p>
+        <p className="text-muted-foreground mt-1">Upload a document for classification</p>
       </div>
 
       <form onSubmit={handleSubmit}>
@@ -75,15 +73,9 @@ function UploadPage() {
               disabled={isUploading}
             />
 
-            {validationError && (
-              <p className="text-sm text-destructive">{validationError}</p>
-            )}
+            {validationError && <p className="text-sm text-destructive">{validationError}</p>}
 
-            <MetadataFieldList
-              entries={metadata}
-              onChange={setMetadata}
-              disabled={isUploading}
-            />
+            <MetadataFieldList entries={metadata} onChange={setMetadata} disabled={isUploading} />
 
             {isUploading && (
               <div className="space-y-2">
@@ -94,9 +86,7 @@ function UploadPage() {
               </div>
             )}
 
-            {error && (
-              <p className="text-sm text-destructive">{error.message}</p>
-            )}
+            {error && <p className="text-sm text-destructive">{error.message}</p>}
 
             <Button
               type="submit"

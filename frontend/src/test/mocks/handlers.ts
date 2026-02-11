@@ -28,10 +28,7 @@ export const handlers = [
   http.get("/api/documents/:id", ({ params }) => {
     const id = params.id as string;
     if (id === "nonexistent") {
-      return HttpResponse.json(
-        { error: "Document not found" },
-        { status: 404 }
-      );
+      return HttpResponse.json({ error: "Document not found" }, { status: 404 });
     }
     return HttpResponse.json(createMockDocument({ id }));
   }),
@@ -40,10 +37,7 @@ export const handlers = [
   http.get("/api/documents/:id/ocr", ({ params }) => {
     const id = params.id as string;
     if (id === "nonexistent" || id === "no-ocr") {
-      return HttpResponse.json(
-        { error: "No OCR results" },
-        { status: 404 }
-      );
+      return HttpResponse.json({ error: "No OCR results" }, { status: 404 });
     }
     return HttpResponse.json(MOCK_OCR_RESULT);
   }),
@@ -60,9 +54,7 @@ export const handlers = [
 
   // Upload document
   http.post("/api/documents/upload", async () => {
-    return HttpResponse.json(
-      createMockDocument({ id: "new-upload-001" })
-    );
+    return HttpResponse.json(createMockDocument({ id: "new-upload-001" }));
   }),
 
   // Search documents
@@ -74,10 +66,7 @@ export const handlers = [
   http.delete("/api/documents/:id", ({ params }) => {
     const id = params.id as string;
     if (id === "nonexistent") {
-      return HttpResponse.json(
-        { error: "Document not found" },
-        { status: 404 }
-      );
+      return HttpResponse.json({ error: "Document not found" }, { status: 404 });
     }
     return new HttpResponse(null, { status: 204 });
   }),
@@ -86,10 +75,7 @@ export const handlers = [
   http.post("/api/documents/:id/retry", ({ params }) => {
     const id = params.id as string;
     if (id === "nonexistent") {
-      return HttpResponse.json(
-        { error: "Document not found" },
-        { status: 404 }
-      );
+      return HttpResponse.json({ error: "Document not found" }, { status: 404 });
     }
     return HttpResponse.json(
       createMockDocument({
@@ -98,7 +84,7 @@ export const handlers = [
         confidence: null,
         hasOcrResults: false,
         updatedAt: new Date().toISOString(),
-      })
+      }),
     );
   }),
 ];

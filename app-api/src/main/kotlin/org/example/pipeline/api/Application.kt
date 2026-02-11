@@ -20,8 +20,17 @@ import org.slf4j.LoggerFactory
 
 private val logger = LoggerFactory.getLogger("Application")
 
+/** Default HTTP server port when SERVER_PORT env var is not set. */
+private const val DEFAULT_SERVER_PORT = 8080
+
+/**
+ * Entry point for the Document Pipeline API server.
+ *
+ * Starts an embedded Netty server with configurable host and port
+ * via SERVER_HOST and SERVER_PORT environment variables.
+ */
 fun main() {
-    val port = System.getenv("SERVER_PORT")?.toIntOrNull() ?: 8080
+    val port = System.getenv("SERVER_PORT")?.toIntOrNull() ?: DEFAULT_SERVER_PORT
     val host = System.getenv("SERVER_HOST") ?: "0.0.0.0"
 
     logger.info("Starting Document Pipeline API on $host:$port")
@@ -31,6 +40,12 @@ fun main() {
     }.start(wait = true)
 }
 
+/**
+ * Configures the Ktor application module.
+ *
+ * Installs Koin DI, CORS, JSON content negotiation, status pages
+ * error handling, and registers document API routes.
+ */
 fun Application.module() {
     // Install Koin for dependency injection
     install(Koin) {
@@ -68,12 +83,18 @@ fun Application.module() {
     install(StatusPages) {
         exception<IllegalArgumentException> { call, cause ->
             logger.warn("Bad request: ${cause.message}")
-            call.respond(HttpStatusCode.BadRequest, mapOf("error" to (cause.message ?: "Bad request")))
+            call.respond(
+                HttpStatusCode.BadRequest,
+                mapOf("error" to (cause.message ?: "Bad request"))
+            )
         }
 
         exception<NoSuchElementException> { call, cause ->
             logger.warn("Not found: ${cause.message}")
-            call.respond(HttpStatusCode.NotFound, mapOf("error" to (cause.message ?: "Not found")))
+            call.respond(
+                HttpStatusCode.NotFound,
+                mapOf("error" to (cause.message ?: "Not found"))
+            )
         }
 
         exception<Throwable> { call, cause ->

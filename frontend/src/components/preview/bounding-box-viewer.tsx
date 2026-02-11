@@ -14,6 +14,7 @@ interface BoundingBoxViewerProps {
   mimeType: string;
 }
 
+/** Deep-zoom viewer that overlays OCR bounding boxes on PDF pages or images. */
 export function BoundingBoxViewer({ documentId, mimeType }: BoundingBoxViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<OpenSeadragon.Viewer | null>(null);
@@ -43,14 +44,15 @@ export function BoundingBoxViewer({ documentId, mimeType }: BoundingBoxViewerPro
           overlay.style.border = "2px solid rgba(59, 130, 246, 0.6)";
           overlay.style.backgroundColor = "rgba(59, 130, 246, 0.1)";
           overlay.style.cursor = "pointer";
-          overlay.title = block.text || `Region at (${Math.round(block.bbox.x)}, ${Math.round(block.bbox.y)})`;
+          overlay.title =
+            block.text || `Region at (${Math.round(block.bbox.x)}, ${Math.round(block.bbox.y)})`;
 
           // Convert pixel coordinates to normalized viewport coordinates
           const rect = new OpenSeadragon.Rect(
             block.bbox.x / page.width,
             block.bbox.y / page.height,
             block.bbox.width / page.width,
-            block.bbox.height / page.height
+            block.bbox.height / page.height,
           );
 
           viewer.addOverlay({
@@ -60,7 +62,7 @@ export function BoundingBoxViewer({ documentId, mimeType }: BoundingBoxViewerPro
         }
       });
     },
-    [ocr]
+    [ocr],
   );
 
   const renderPageWithBoxes = useCallback(
@@ -92,7 +94,7 @@ export function BoundingBoxViewer({ documentId, mimeType }: BoundingBoxViewerPro
         setError("Failed to render page");
       }
     },
-    [documentId, mimeType, addOverlays]
+    [documentId, mimeType, addOverlays],
   );
 
   useEffect(() => {
@@ -168,7 +170,7 @@ export function BoundingBoxViewer({ documentId, mimeType }: BoundingBoxViewerPro
       setCurrentPage(pageIdx);
       renderPageWithBoxes(pageIdx);
     },
-    [pageCount, renderPageWithBoxes]
+    [pageCount, renderPageWithBoxes],
   );
 
   if (ocrLoading) {
@@ -181,11 +183,7 @@ export function BoundingBoxViewer({ documentId, mimeType }: BoundingBoxViewerPro
   }
 
   if (error) {
-    return (
-      <div className="flex items-center justify-center h-96 text-destructive">
-        {error}
-      </div>
-    );
+    return <div className="flex items-center justify-center h-96 text-destructive">{error}</div>;
   }
 
   return (

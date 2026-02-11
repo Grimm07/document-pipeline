@@ -2,7 +2,6 @@ package org.example.pipeline.worker
 
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
-import io.kotest.matchers.shouldBe
 import io.mockk.*
 import org.example.pipeline.domain.*
 import org.example.pipeline.storage.LocalFileStorageService
@@ -224,6 +223,48 @@ class DocumentProcessorTest : FunSpec({
             } finally {
                 tempDir.toFile().deleteRecursively()
             }
+        }
+    }
+
+    context("OCR storage failure") {
+        test("OCR storage IOException propagates") {
+            val doc = testDocument()
+            val content = "pdf content".toByteArray()
+            val ocrJson = """{"pages":[],"fullText":"extracted text"}"""
+            val result = ClassificationResult("invoice", 0.95f, ocrResultJson = ocrJson)
+
+            coEvery { mockRepo.getById(testDocId) } returns doc
+            coEvery { mockStorage.retrieve(doc.storagePath) } returns content
+            coEvery { mockClassification.classify(content, "application/pdf") } returns result
+            coEvery { mockStorage.store("$testDocId-ocr", "ocr-results.json", any()) } throws java.io.IOException("Disk full")
+
+            shouldThrow<java.io.IOException> {
+                processor.process(testDocId)
+            }
+
+            // Verify updateClassification was NOT called (OCR store failed first)
+            coVerify(exactly = 0) { mockRepo.updateClassification(any(), any(), any(), any()) }
+        }
+
+        test("handles very large OCR JSON") {
+            val doc = testDocument()
+            val content = "pdf content".toByteArray()
+            // Create a large OCR JSON (~1MB)
+            val largeText = "x".repeat(1_000_000)
+            val ocrJson = """{"pages":[{"pageIndex":0,"width":100,"height":200,"text":"$largeText","blocks":[]}],"fullText":"$largeText"}"""
+            val result = ClassificationResult("invoice", 0.95f, ocrResultJson = ocrJson)
+            val ocrPath = "2024/07/15/${testDocId}-ocr/ocr-results.json"
+
+            coEvery { mockRepo.getById(testDocId) } returns doc
+            coEvery { mockStorage.retrieve(doc.storagePath) } returns content
+            coEvery { mockClassification.classify(content, "application/pdf") } returns result
+            coEvery { mockStorage.store("$testDocId-ocr", "ocr-results.json", any()) } returns ocrPath
+            coEvery { mockRepo.updateClassification(testDocId, "invoice", 0.95f, ocrPath) } returns true
+
+            processor.process(testDocId)
+
+            // Verify store was called with the full large content
+            coVerify { mockStorage.store("$testDocId-ocr", "ocr-results.json", ocrJson.toByteArray()) }
         }
     }
 })

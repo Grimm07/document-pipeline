@@ -15,6 +15,12 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
+      testIgnore: "**/full-pipeline.spec.ts",
+    },
+    {
+      name: "full-stack",
+      use: { ...devices["Desktop Chrome"] },
+      testMatch: "**/full-pipeline.spec.ts",
     },
   ],
   webServer: {

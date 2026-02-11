@@ -35,9 +35,9 @@ describe("MetadataFieldList", () => {
     const entries = [{ key: "dept", value: "finance" }];
     render(<MetadataFieldList entries={entries} onChange={onChange} />);
 
-    const removeButtons = screen.getAllByRole("button").filter(
-      (b) => b.textContent !== "Add Field"
-    );
+    const removeButtons = screen
+      .getAllByRole("button")
+      .filter((b) => b.textContent !== "Add Field");
     await user.click(removeButtons[0]!);
     expect(onChange).toHaveBeenCalledWith([]);
   });

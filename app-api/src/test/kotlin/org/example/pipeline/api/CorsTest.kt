@@ -1,9 +1,7 @@
 package org.example.pipeline.api
 
-import com.typesafe.config.ConfigFactory
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.string.shouldContain
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*

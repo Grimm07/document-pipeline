@@ -16,6 +16,9 @@ object DatabaseConfig {
 
     private val logger = LoggerFactory.getLogger(DatabaseConfig::class.java)
 
+    /** Timeout in milliseconds for connection validation queries. */
+    private const val VALIDATION_TIMEOUT_MS = 3000L
+
     /**
      * Initializes the database connection pool and runs migrations.
      *
@@ -57,7 +60,7 @@ object DatabaseConfig {
 
             // Connection validation
             this.connectionTestQuery = "SELECT 1"
-            this.validationTimeout = 3000
+            this.validationTimeout = VALIDATION_TIMEOUT_MS
 
             // Pool naming for monitoring
             this.poolName = "DocumentPipelinePool"

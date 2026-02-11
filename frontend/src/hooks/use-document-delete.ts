@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { deleteDocument } from "@/lib/api/documents";
 import { documentKeys } from "@/lib/query-keys";
 
+/** Hook that deletes a single document and navigates back to the document list. */
 export function useDocumentDelete(id: string) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();

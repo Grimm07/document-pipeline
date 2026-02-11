@@ -1,0 +1,123 @@
+comments:
+  active: true
+  UndocumentedPublicClass:
+    active: true
+    excludes: ['**/test/**']
+  UndocumentedPublicFunction:
+    active: true
+    excludes: ['**/test/**']
+  UndocumentedPublicProperty:
+    active: true
+    excludes: ['**/test/**']
+  AbsentOrWrongFileLicense:
+    active: false
+  CommentOverPrivateFunction:
+    active: false
+  CommentOverPrivateProperty:
+    active: false
+  DeprecatedBlockTag:
+    active: true
+  EndOfSentenceFormat:
+    active: false
+  KDocReferencesNonPublicProperty:
+    active: true
+  OutdatedDocumentation:
+    active: true
+
+complexity:
+  active: true
+  LargeClass:
+    active: true
+    excludes: ['**/test/**']
+  LongMethod:
+    active: true
+    threshold: 60
+  LongParameterList:
+    active: true
+    functionThreshold: 6
+    constructorThreshold: 7
+    ignoreDataClasses: true
+    ignoreDefaultParameters: true
+  NestedBlockDepth:
+    active: true
+    threshold: 4
+  TooManyFunctions:
+    active: true
+    thresholdInFiles: 15
+    thresholdInClasses: 15
+    thresholdInInterfaces: 15
+    thresholdInObjects: 15
+    thresholdInEnums: 15
+    ignoreOverridden: true
+  CyclomaticComplexMethod:
+    active: true
+    threshold: 15
+
+exceptions:
+  active: true
+  TooGenericExceptionCaught:
+    active: true
+    excludes: ['**/test/**']
+  TooGenericExceptionThrown:
+    active: true
+    excludes: ['**/test/**']
+
+potential-bugs:
+  active: true
+  UnsafeCallOnNullableType:
+    active: true
+    excludes: ['**/test/**']
+  UnreachableCode:
+    active: true
+  HasPlatformType:
+    active: true
+  MapGetWithNotNullAssertionOperator:
+    active: true
+
+style:
+  active: true
+  MaxLineLength:
+    active: true
+    maxLineLength: 140
+    excludeCommentStatements: true
+  UnusedImports:
+    active: true
+  WildcardImport:
+    active: true
+    excludeImports:
+      - 'org.jetbrains.exposed.sql.*'
+      - 'io.ktor.server.*'
+      - 'io.ktor.client.*'
+      - 'io.ktor.http.*'
+      - 'io.ktor.serialization.kotlinx.json.*'
+      - 'com.rabbitmq.client.*'
+      - 'io.kotest.matchers.*'
+      - 'io.kotest.property.*'
+      - 'io.kotest.assertions.*'
+      - 'io.mockk.*'
+      - 'kotlin.io.path.*'
+      - 'kotlinx.coroutines.*'
+      - 'org.example.pipeline.domain.*'
+      - 'org.example.pipeline.api.dto.*'
+  MagicNumber:
+    active: true
+    excludes: ['**/test/**']
+    ignoreNumbers:
+      - '-1'
+      - '0'
+      - '1'
+      - '2'
+    ignoreHashCodeFunction: true
+    ignorePropertyDeclaration: true
+    ignoreAnnotation: true
+    ignoreEnums: true
+    ignoreRanges: true
+    ignoreExtensionFunctions: true
+  ReturnCount:
+    active: true
+    max: 4
+    excludeGuardClauses: true
+  UnusedPrivateProperty:
+    active: true
+  ForbiddenComment:
+    active: false

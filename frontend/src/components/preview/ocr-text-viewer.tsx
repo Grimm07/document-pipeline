@@ -8,6 +8,7 @@ interface OcrTextViewerProps {
   documentId: string;
 }
 
+/** Displays extracted OCR text and full OCR result details as a JSON tree. */
 export function OcrTextViewer({ documentId }: OcrTextViewerProps) {
   const { data: ocr, isLoading, isError, error } = useDocumentOcr(documentId);
   const { theme } = useTheme();
@@ -37,7 +38,9 @@ export function OcrTextViewer({ documentId }: OcrTextViewerProps) {
     );
   }
 
-  const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const isDark =
+    theme === "dark" ||
+    (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
 
   return (
     <div className="space-y-4">
@@ -51,7 +54,9 @@ export function OcrTextViewer({ documentId }: OcrTextViewerProps) {
 
       {/* Full OCR result as JSON tree */}
       <div className="rounded-lg border p-4 max-h-[400px] overflow-auto">
-        <h3 className="text-sm font-medium mb-2">OCR Details ({ocr.pages.length} page{ocr.pages.length !== 1 ? "s" : ""})</h3>
+        <h3 className="text-sm font-medium mb-2">
+          OCR Details ({ocr.pages.length} page{ocr.pages.length !== 1 ? "s" : ""})
+        </h3>
         <JsonView
           data={ocr as unknown as object}
           shouldExpandNode={allExpanded}

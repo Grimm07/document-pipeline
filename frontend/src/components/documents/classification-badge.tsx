@@ -7,10 +7,8 @@ interface ClassificationBadgeProps {
   className?: string;
 }
 
-export function ClassificationBadge({
-  classification,
-  className,
-}: ClassificationBadgeProps) {
+/** Colored badge displaying a document's classification label. */
+export function ClassificationBadge({ classification, className }: ClassificationBadgeProps) {
   const isUnclassified = classification === "unclassified";
 
   return (
@@ -19,7 +17,7 @@ export function ClassificationBadge({
       className={cn(
         getClassificationColor(classification),
         isUnclassified && "animate-pulse",
-        className
+        className,
       )}
     >
       {classification}

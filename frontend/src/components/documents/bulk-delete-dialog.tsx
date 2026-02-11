@@ -18,11 +18,8 @@ interface BulkDeleteDialogProps {
   isPending: boolean;
 }
 
-export function BulkDeleteDialog({
-  selectedCount,
-  onConfirm,
-  isPending,
-}: BulkDeleteDialogProps) {
+/** Confirmation dialog for bulk-deleting selected documents. */
+export function BulkDeleteDialog({ selectedCount, onConfirm, isPending }: BulkDeleteDialogProps) {
   const [open, setOpen] = useState(false);
   const plural = selectedCount !== 1 ? "s" : "";
 
@@ -34,30 +31,24 @@ export function BulkDeleteDialog({
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        <Button
-          variant="destructive"
-          size="sm"
-          disabled={selectedCount === 0}
-        >
+        <Button variant="destructive" size="sm" disabled={selectedCount === 0}>
           <Trash2 className="size-4 mr-1.5" />
           Delete ({selectedCount})
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete {selectedCount} document{plural}?</AlertDialogTitle>
+          <AlertDialogTitle>
+            Delete {selectedCount} document{plural}?
+          </AlertDialogTitle>
           <AlertDialogDescription>
-            This will permanently delete {selectedCount} document{plural} and
-            all associated files. This action cannot be undone.
+            This will permanently delete {selectedCount} document{plural} and all associated files.
+            This action cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
-          <Button
-            variant="destructive"
-            onClick={handleConfirm}
-            disabled={isPending}
-          >
+          <Button variant="destructive" onClick={handleConfirm} disabled={isPending}>
             {isPending && <Loader2 className="size-4 mr-2 animate-spin" />}
             Delete
           </Button>

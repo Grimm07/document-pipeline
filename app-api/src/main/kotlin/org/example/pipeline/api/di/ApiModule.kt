@@ -14,10 +14,18 @@ import org.koin.dsl.module
 import org.koin.dsl.onClose
 import java.nio.file.Paths
 
+/** Default connection pool size when not specified in configuration. */
+private const val DEFAULT_POOL_SIZE = 10
+
+/** Default RabbitMQ port when not specified in configuration. */
+private const val DEFAULT_RABBITMQ_PORT = 5672
+
 /**
  * Koin module for API dependencies.
  *
- * Wires together all infrastructure implementations with domain interfaces.
+ * Wires together all infrastructure implementations with domain interfaces:
+ * HOCON config, PostgreSQL (HikariCP + Flyway), Exposed repository,
+ * local file storage, and RabbitMQ publisher.
  */
 val apiModule = module {
 
@@ -33,7 +41,8 @@ val apiModule = module {
             jdbcUrl = config.property("database.jdbcUrl").getString(),
             username = config.property("database.username").getString(),
             password = config.property("database.password").getString(),
-            maxPoolSize = config.propertyOrNull("database.maxPoolSize")?.getString()?.toIntOrNull() ?: 10
+            maxPoolSize = config.propertyOrNull("database.maxPoolSize")
+                ?.getString()?.toIntOrNull() ?: DEFAULT_POOL_SIZE
         )
     } onClose { dataSource ->
         (dataSource as? java.io.Closeable)?.close()
@@ -58,10 +67,12 @@ val apiModule = module {
         val config = get<HoconApplicationConfig>()
         RabbitMQConfig.createConnection(
             host = config.property("rabbitmq.host").getString(),
-            port = config.propertyOrNull("rabbitmq.port")?.getString()?.toIntOrNull() ?: 5672,
+            port = config.propertyOrNull("rabbitmq.port")
+                ?.getString()?.toIntOrNull() ?: DEFAULT_RABBITMQ_PORT,
             username = config.property("rabbitmq.username").getString(),
             password = config.property("rabbitmq.password").getString(),
-            virtualHost = config.propertyOrNull("rabbitmq.virtualHost")?.getString() ?: "/"
+            virtualHost = config.propertyOrNull("rabbitmq.virtualHost")
+                ?.getString() ?: "/"
         )
     }
 

@@ -1,0 +1,22 @@
+# Docker Compose override — replaces the GPU-based ML service with a lightweight mock.
+# Usage: docker compose -f docker/docker-compose.yml -f docker/docker-compose.mock.yml up -d
+#
+# Requires Docker Compose v2.24.0+ for !reset tag support.
+services:
+  ml-service:
+    build:
+      context: ../docker/mock-ml-service
+    container_name: document-pipeline-ml
+    ports:
+      - "8000:8000"
+    volumes: !reset []
+    environment: !reset {}
+    deploy: !reset {}
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    networks:
+      - pipeline-network

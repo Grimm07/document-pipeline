@@ -18,6 +18,7 @@ interface DeleteDocumentDialogProps {
   trigger: React.ReactNode;
 }
 
+/** Confirmation dialog for deleting a single document. */
 export function DeleteDocumentDialog({
   documentId,
   documentName,
@@ -33,17 +34,13 @@ export function DeleteDocumentDialog({
           <AlertDialogTitle>Delete document?</AlertDialogTitle>
           <AlertDialogDescription>
             This will permanently delete{" "}
-            <span className="font-medium text-foreground">{documentName}</span>{" "}
-            and all associated files. This action cannot be undone.
+            <span className="font-medium text-foreground">{documentName}</span> and all associated
+            files. This action cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
-          <Button
-            variant="destructive"
-            onClick={() => deleteDoc()}
-            disabled={isPending}
-          >
+          <Button variant="destructive" onClick={() => deleteDoc()} disabled={isPending}>
             {isPending && <Loader2 className="size-4 mr-2 animate-spin" />}
             Delete
           </Button>

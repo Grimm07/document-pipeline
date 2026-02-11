@@ -13,6 +13,15 @@ import org.slf4j.LoggerFactory
 
 private val logger = LoggerFactory.getLogger("WorkerApplication")
 
+/** Default RabbitMQ port used when not specified in configuration. */
+private const val DEFAULT_RABBITMQ_PORT = 5672
+
+/**
+ * Entry point for the Document Pipeline Worker application.
+ *
+ * Initializes the database, starts Koin DI, connects to RabbitMQ,
+ * and begins consuming document processing messages.
+ */
 fun main() {
     logger.info("Starting Document Pipeline Worker")
 
@@ -37,7 +46,7 @@ fun main() {
     // Create RabbitMQ connection and consumer
     val rabbitConnection = RabbitMQConfig.createConnection(
         host = config.property("rabbitmq.host").getString(),
-        port = config.propertyOrNull("rabbitmq.port")?.getString()?.toIntOrNull() ?: 5672,
+        port = config.propertyOrNull("rabbitmq.port")?.getString()?.toIntOrNull() ?: DEFAULT_RABBITMQ_PORT,
         username = config.property("rabbitmq.username").getString(),
         password = config.property("rabbitmq.password").getString()
     )

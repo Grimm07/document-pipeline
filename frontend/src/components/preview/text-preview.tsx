@@ -5,6 +5,7 @@ interface TextPreviewProps {
   documentId: string;
 }
 
+/** Plain text document preview rendered in a scrollable pre block. */
 export function TextPreview({ documentId }: TextPreviewProps) {
   const [content, setContent] = useState<string | null>(null);
 

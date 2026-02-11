@@ -5,6 +5,7 @@ interface EmptyStateProps {
   description?: string;
 }
 
+/** Displays a centered placeholder with icon when no content is available. */
 export function EmptyState({
   title = "No documents found",
   description = "Upload a document to get started.",

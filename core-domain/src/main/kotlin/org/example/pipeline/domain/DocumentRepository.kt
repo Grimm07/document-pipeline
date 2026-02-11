@@ -56,6 +56,7 @@ interface DocumentRepository {
      * @param id The document UUID as string
      * @param classification The new classification
      * @param confidence The confidence score
+     * @param ocrStoragePath Optional path to stored OCR results
      * @return True if the document was updated, false if not found
      */
     suspend fun updateClassification(

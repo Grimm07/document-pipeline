@@ -5,19 +5,15 @@ import { uploadDocument } from "@/lib/api/documents";
 import { documentKeys } from "@/lib/query-keys";
 import type { DocumentResponse } from "@/types/api";
 
+/** Hook that handles file upload with progress tracking and post-upload navigation. */
 export function useDocumentUpload() {
   const [progress, setProgress] = useState(0);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
   const mutation = useMutation({
-    mutationFn: ({
-      file,
-      metadata,
-    }: {
-      file: File;
-      metadata: Record<string, string>;
-    }) => uploadDocument(file, metadata, setProgress),
+    mutationFn: ({ file, metadata }: { file: File; metadata: Record<string, string> }) =>
+      uploadDocument(file, metadata, setProgress),
     onSuccess: (data: DocumentResponse) => {
       // Cache the newly uploaded document
       queryClient.setQueryData(documentKeys.detail(data.id), data);

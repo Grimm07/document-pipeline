@@ -8,6 +8,7 @@ const navLinks = [
   { to: "/upload", label: "Upload", icon: Upload },
 ] as const;
 
+/** Sticky top navigation bar with links to Dashboard, Documents, and Upload pages. */
 export function AppHeader() {
   return (
     <header className="sticky top-0 z-50 glass border-b border-border/40">

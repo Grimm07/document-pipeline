@@ -45,6 +45,19 @@ for arg in "$@"; do
 done
 
 # ---------------------------------------------------------------------------
+# GPU detection — use mock ML service when no GPU available
+# ---------------------------------------------------------------------------
+COMPOSE_FILES="-f docker/docker-compose.yml"
+if command -v nvidia-smi &>/dev/null && nvidia-smi &>/dev/null; then
+  echo "[ml]   GPU detected — using real ML service."
+  ML_TIMEOUT=180
+else
+  echo "[ml]   No GPU detected — using mock ML service."
+  COMPOSE_FILES="$COMPOSE_FILES -f docker/docker-compose.mock.yml"
+  ML_TIMEOUT=30
+fi
+
+# ---------------------------------------------------------------------------
 # --stop: tear down everything and exit
 # ---------------------------------------------------------------------------
 if $STOP || $DESTROY; then
@@ -78,11 +91,11 @@ if $STOP || $DESTROY; then
   # Docker: --destroy removes containers + volumes; --stop just pauses them
   if $DESTROY; then
     echo "[infra]  Removing Docker containers and volumes..."
-    docker compose -f docker/docker-compose.yml down -v
+    docker compose $COMPOSE_FILES down -v
     echo "[infra]  Removed."
   else
     echo "[infra]  Stopping Docker services..."
-    docker compose -f docker/docker-compose.yml stop
+    docker compose $COMPOSE_FILES stop
     echo "[infra]  Stopped."
   fi
 
@@ -235,7 +248,7 @@ fi
 # docker compose up -d is idempotent — already-running containers are untouched.
 # --wait blocks until all healthchecks pass (Postgres pg_isready, RabbitMQ ping).
 echo "[infra] Starting Docker services..."
-docker compose -f docker/docker-compose.yml up -d --wait
+docker compose $COMPOSE_FILES up -d --wait
 echo "[infra] Ready."
 
 # ---------------------------------------------------------------------------
@@ -247,7 +260,6 @@ echo "[infra] Ready."
 # is ready.
 if ! $SKIP_ML; then
   echo "[ml]   Waiting for ML service on port 8000 (model loading may take a few minutes)..."
-  ML_TIMEOUT=180
   ML_ELAPSED=0
   while ! curl -sf http://localhost:8000/health 2>/dev/null | grep -q '"models_loaded":true'; do
     if (( ML_ELAPSED >= ML_TIMEOUT )); then

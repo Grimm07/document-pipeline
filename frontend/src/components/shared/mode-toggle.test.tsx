@@ -13,7 +13,7 @@ describe("ModeToggle", () => {
     render(
       <ThemeProvider defaultTheme="dark">
         <ModeToggle />
-      </ThemeProvider>
+      </ThemeProvider>,
     );
     expect(screen.getByRole("button", { name: /toggle theme/i })).toBeInTheDocument();
   });
@@ -23,7 +23,7 @@ describe("ModeToggle", () => {
     render(
       <ThemeProvider defaultTheme="dark">
         <ModeToggle />
-      </ThemeProvider>
+      </ThemeProvider>,
     );
 
     await user.click(screen.getByRole("button", { name: /toggle theme/i }));

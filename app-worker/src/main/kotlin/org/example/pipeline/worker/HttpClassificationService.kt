@@ -13,17 +13,19 @@ import kotlinx.serialization.json.JsonElement
 import org.example.pipeline.domain.ClassificationResult
 import org.example.pipeline.domain.ClassificationService
 import org.slf4j.LoggerFactory
+import java.io.IOException
+
+/** Default request timeout in milliseconds for ML service calls (5 minutes). */
+private const val DEFAULT_TIMEOUT_MS = 300_000L
 
 /**
  * HTTP-based implementation of [ClassificationService].
  *
  * Calls an external ML service (e.g., Python/FastAPI) to classify documents.
- *
- * @property baseUrl Base URL of the ML classification service
  */
 class HttpClassificationService(
     private val baseUrl: String,
-    private val requestTimeoutMs: Long = 300_000
+    private val requestTimeoutMs: Long = DEFAULT_TIMEOUT_MS
 ) : ClassificationService {
 
     private val logger = LoggerFactory.getLogger(HttpClassificationService::class.java)
@@ -51,11 +53,15 @@ class HttpClassificationService(
         }
 
         if (!response.status.isSuccess()) {
-            throw RuntimeException("Classification service returned ${response.status}")
+            throw IOException("Classification service returned ${response.status}")
         }
 
         val classifyResponse = response.body<ClassifyWithOcrResponse>()
-        logger.info("Classification result: {} (confidence: {})", classifyResponse.classification, classifyResponse.confidence)
+        logger.info(
+            "Classification result: {} (confidence: {})",
+            classifyResponse.classification,
+            classifyResponse.confidence
+        )
 
         val ocrJson = classifyResponse.ocr?.let { Json.encodeToString(it) }
 

@@ -1,9 +1,10 @@
 import type { ErrorResponse } from "@/types/api";
 
+/** Custom error representing a non-OK HTTP response from the API. */
 export class ApiError extends Error {
   constructor(
     public status: number,
-    public body: ErrorResponse
+    public body: ErrorResponse,
   ) {
     super(body.error);
     this.name = "ApiError";
@@ -12,10 +13,8 @@ export class ApiError extends Error {
 
 const BASE_URL = "/api";
 
-export async function apiFetch<T>(
-  path: string,
-  init?: RequestInit
-): Promise<T> {
+/** Typed fetch wrapper that prepends the API base URL and handles errors. */
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${BASE_URL}${path}`, {
     headers: {
       Accept: "application/json",

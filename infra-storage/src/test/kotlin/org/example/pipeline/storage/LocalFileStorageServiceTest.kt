@@ -266,6 +266,47 @@ class LocalFileStorageServiceTest : FunSpec({
         }
     }
 
+    context("filename edge cases") {
+        test("no extension uses bin fallback") {
+            val path = service.store("edge-no-ext", "README", "content".toByteArray())
+            path.shouldContain(".bin")
+        }
+
+        test("multiple dots uses last extension") {
+            val path = service.store("edge-multi-dot", "archive.tar.gz", "content".toByteArray())
+            path.shouldContain(".gz")
+        }
+
+        test("dot-only filename produces retrievable file") {
+            val path = service.store("edge-dot-only", ".", "content".toByteArray())
+            // substringAfterLast('.', "bin") returns "" for "."
+            // This produces a path ending with "edge-dot-only." which is a trailing dot
+            // Verify the round-trip still works
+            val stored = service.retrieve(path)
+            stored shouldBe "content".toByteArray()
+        }
+
+        test("empty filename uses bin fallback") {
+            val path = service.store("edge-empty", "", "content".toByteArray())
+            path.shouldContain(".bin")
+        }
+
+        test("trailing dot filename produces retrievable file") {
+            val path = service.store("edge-trailing-dot", "file.", "content".toByteArray())
+            // substringAfterLast('.', "bin") returns "" for "file."
+            // Documents current behavior - round-trip still works
+            val stored = service.retrieve(path)
+            stored shouldBe "content".toByteArray()
+        }
+
+        test("filename with spaces works") {
+            val path = service.store("edge-spaces", "my document.pdf", "content".toByteArray())
+            path.shouldContain(".pdf")
+            val stored = service.retrieve(path)
+            stored shouldBe "content".toByteArray()
+        }
+    }
+
     context("date-based path generation") {
         test("storage path contains date components matching the current clock time") {
             // Freeze Clock.System to a known instant: 2024-07-15T12:00:00Z

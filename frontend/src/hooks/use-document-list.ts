@@ -3,6 +3,7 @@ import { fetchDocuments } from "@/lib/api/documents";
 import { documentKeys } from "@/lib/query-keys";
 import { DEFAULT_PAGE_SIZE } from "@/lib/constants";
 
+/** Hook that fetches a paginated, infinite-scrollable list of documents. */
 export function useDocumentList(classification?: string) {
   return useInfiniteQuery({
     queryKey: documentKeys.list({ classification, limit: DEFAULT_PAGE_SIZE }),

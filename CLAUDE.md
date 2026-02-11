@@ -12,7 +12,7 @@
 
 Document Pipeline — a multi-module Kotlin document ingestion service. Accepts document uploads (PDF, images, text) via REST API, stores files locally, persists metadata in PostgreSQL, and dispatches async classification jobs through RabbitMQ to a worker that calls an external ML service.
 
-**Current state**: All business logic implemented, security-hardened (Pass 1), document viewers + OCR pipeline complete (Pass 2). Frontend SPA in `frontend/` with rich viewers (JSON/XML/PDF deep zoom) and OCR results display (tabbed viewer with bounding box overlays). ML service has `/classify-with-ocr` endpoint with PaddleOCR bounding box detection. All tests pass (`./gradlew test` and `cd frontend && npm test`). Run `grep -rn "TODO()" --include="*.kt" .` to verify no stubs remain.
+**Current state**: All business logic implemented, security-hardened (Pass 1), document viewers + OCR pipeline complete (Pass 2), test coverage expanded (Pass 3), linting + documentation enforced (Pass 4). Frontend SPA in `frontend/` with rich viewers (JSON/XML/PDF deep zoom) and OCR results display (tabbed viewer with bounding box overlays). ML service has `/classify-with-ocr` endpoint with PaddleOCR bounding box detection. All tests pass (`./gradlew test` and `cd frontend && npm test`). All linters pass (`./gradlew detekt`, `ruff check`, `eslint`). Run `grep -rn "TODO()" --include="*.kt" .` to verify no stubs remain.
 
 ## Build & Run Commands
 
@@ -62,6 +62,7 @@ docker compose -f docker/docker-compose.yml build ml-service
 # --- ML Service (Python, FastAPI) ---
 
 # Run ML service tests (no GPU needed — all mocked)
+# NOTE: pip install -e ".[dev]" may fail on paddlepaddle — install tools directly if needed: pip install ruff pytest
 cd ml-service && pip install -e ".[dev]" && pytest tests/ -v
 
 # Run ML service via Docker (first run downloads ~4GB of model weights)
@@ -92,6 +93,29 @@ cd frontend && npm run test:e2e
 
 # Type-check frontend
 cd frontend && npx tsc -b
+
+# --- Linting ---
+
+# Run Kotlin linter (Detekt) — also runs as part of ./gradlew build
+./gradlew detekt
+
+# Run Python linter (Ruff)
+cd ml-service && ruff check app/ && ruff format --check app/
+
+# Auto-fix Python lint + format
+cd ml-service && ruff check --fix app/ && ruff format app/
+
+# Run TypeScript linter (ESLint + type-check)
+cd frontend && npm run lint
+
+# Auto-fix TypeScript lint
+cd frontend && npm run lint:fix
+
+# Check TypeScript formatting (Prettier)
+cd frontend && npm run format:check
+
+# Auto-fix TypeScript formatting
+cd frontend && npm run format
 ```
 
 **Quick start**: `docker compose -f docker/docker-compose.yml up -d && ./gradlew build`
@@ -117,19 +141,20 @@ ml-service/ ────── (Python FastAPI, pip-managed) ◀── app-worke
 
 **core-domain** defines the contracts: `DocumentRepository`, `FileStorageService`, `ClassificationService`, `QueuePublisher`. Infrastructure modules provide implementations. App modules wire everything with Koin DI.
 
+**Linting config**: `config/detekt/detekt.yml` (Kotlin), `ml-service/pyproject.toml` `[tool.ruff]` (Python), `frontend/eslint.config.js` + `frontend/.prettierrc` (TypeScript). Detekt hooks into Gradle `check` task; Ruff and ESLint run standalone.
+
 ### Key Patterns
 
 - **Dependency inversion**: Domain interfaces in `core-domain`, implementations in `infra-*` modules. App modules bind them via Koin (`apiModule` / `workerModule`).
 - **Suspended transactions**: Repository uses `newSuspendedTransaction` from Exposed for coroutine-safe DB access.
 - **HOCON config**: `application.conf` in each app module with `${?ENV_VAR}` overrides. Config is loaded via `HoconApplicationConfig(ConfigFactory.load())`.
 - **RabbitMQ topology**: Topic exchange with dead-letter exchange/queue. Constants in `QueueConstants`. Both publisher and consumer declare identical topology.
-- **Queue message contract**: `DocumentMessage` (`infra-queue`) is the `@Serializable` data class exchanged between publisher and consumer. Contains document ID and action type.
 - **File storage paths**: Date-based layout `{yyyy}/{MM}/{dd}/{uuid}.{ext}` under configurable base directory.
-- **DTOs**: `DocumentResponse`/`UploadResponse`/`DocumentListResponse`/`ErrorResponse` in `app-api/dto/DocumentDtos.kt`. Domain `Document` converts via `Document.toResponse()` extension.
-- **API routes**: `POST /api/documents/upload` (multipart), `GET /api/documents` (list, ?classification&limit&offset), `GET /api/documents/search` (?metadata.*&limit), `GET /api/documents/{id}` (detail), `GET /api/documents/{id}/download` (file bytes), `GET /api/documents/{id}/ocr` (OCR results JSON), `DELETE /api/documents/{id}` (delete document + files). Search and OCR routes must be declared before `{id}` route (Ktor matches in order).
-- **OCR results pipeline**: Worker calls ML service `/classify-with-ocr` → receives OCR JSON with bounding boxes → stores as `{documentId}-ocr/ocr-results.json` via `FileStorageService` → document gets `ocrStoragePath` field → API serves raw JSON at `/{id}/ocr`.
-- **Flyway migrations**: SQL files in `infra-db/src/main/resources/db/migration/` following `V{N}__description.sql` naming. Run automatically on app startup via `DatabaseConfig.init()`.
-- **Database schema**: Single `documents` table (UUID PK, JSONB `metadata`, `ocr_storage_path TEXT`, indexes on `classification`, `created_at`, GIN on `metadata`). Schema: `V1__create_documents_table.sql` + `V2__add_ocr_storage_path.sql`.
+- **Ktor route ordering**: Search and OCR routes must be declared before `{id}` route (Ktor matches first).
+- **OCR results pipeline**: Worker calls ML `/classify-with-ocr` → stores OCR JSON as `{documentId}-ocr/ocr-results.json` → API serves at `/{id}/ocr`.
+- **Flyway migrations**: SQL files in `infra-db/src/main/resources/db/migration/` following `V{N}__description.sql` naming. Run automatically on startup.
+- **ML HTTP contracts**: `POST /classify-with-ocr` — `{"content": "<b64>", "mimeType": "..."}` → `{"classification", "confidence", "ocr": {"pages", "fullText"}}`. Legacy `POST /classify` still available (no OCR).
+- **ML env vars**: `ML_CLASSIFIER_MODEL`, `ML_OCR_MODEL`, `ML_CANDIDATE_LABELS`, `ML_DEVICE` (`cuda`/`cpu`), `ML_TORCH_DTYPE`, `ML_OCR_MAX_PDF_PAGES`, `ML_HF_HOME`
 
 ### Two Runnable Applications
 
@@ -140,45 +165,25 @@ ml-service/ ────── (Python FastAPI, pip-managed) ◀── app-worke
 
 Note the DI asymmetry: API module is a top-level `val`; worker module is a function accepting config.
 
-### Frontend Stack
+### Frontend Notes
 
-- **React 19** with **TypeScript 5.x**, built with **Vite 6.x**
-- **TanStack Router** (file-based routing with auto code-splitting) + **TanStack Query** (server state, polling) + **TanStack Form** (upload form)
-- **Tailwind CSS v4** (via `@tailwindcss/vite` plugin) + **shadcn/ui** (new-york style, dark zinc theme)
-- **Glassmorphism theme** — light/dark mode with `ThemeProvider`, CSS custom properties for glass effects
-- **Document viewers**: `react-json-view-lite` (JSON), `react-xml-viewer` (XML), `pdfjs-dist` + `openseadragon` (PDF deep zoom/pan + bounding box overlays)
-- **OCR results UI**: Tabbed viewer (`DocumentViewerTabs`) — Preview / OCR Text / Bounding Boxes tabs, conditional on `hasOcrResults`
-- **Vitest** + **React Testing Library** + **MSW** (Mock Service Worker) for unit/component/integration tests
-- **Playwright** for E2E tests
-- **Multi-select + bulk delete** on document list — `useSelectionMode` hook (selection state) + `useBulkDelete` hook (`Promise.allSettled` mutation with per-result cache eviction). Selection mode exits on filter change, counts only visible-selected IDs, shows error banner on partial failures.
-- Dev proxy: Vite forwards `/api/*` to `localhost:8080` — no CORS needed in development
+- **Glassmorphism theme** with dark/light mode via `ThemeProvider`
+- **Document viewers**: JSON (`react-json-view-lite`), XML (`react-xml-viewer`), PDF deep zoom (`pdfjs-dist` + `openseadragon`), OCR tabbed viewer with bounding box overlays
+- **Multi-select + bulk delete**: `useSelectionMode` + `useBulkDelete` hooks (`Promise.allSettled` with per-result cache eviction)
+- Dev proxy: Vite forwards `/api/*` to `localhost:8080` — no CORS needed in dev
 
-### ML Service Stack
+### ML Service Notes
 
-- **Python 3.12** with **FastAPI** + **Uvicorn** (ASGI server)
-- **DeBERTa-v3-large NLI** (`MoritzLaurer/DeBERTa-v3-large-mnli-fever-anli-ling-wanli`) — zero-shot document classification
-- **GOT-OCR2** (`stepfun-ai/GOT-OCR-2.0-hf`) — text extraction from images/PDFs
-- **PaddleOCR** (detection-only, `rec=False`) — text region bounding box detection (~3MB model, ~200MB framework)
-- **PyMuPDF** (`fitz`) — PDF→image conversion (no system deps)
-- **Pydantic Settings** — typed env var config with `ML_` prefix
-- Docker: `nvidia/cuda:12.6.3-runtime-ubuntu24.04` base, `ml_models` volume for HF model cache (~4GB)
-- GPU VRAM: ~2.5GB total (DeBERTa ~870MB + GOT-OCR2 ~1.1GB + CUDA overhead)
-- HTTP contracts:
-  - `POST /classify` — `{"content": "<b64>", "mimeType": "..."}` → `{"classification": "...", "confidence": 0.xx}` (legacy, still available)
-  - `POST /classify-with-ocr` — same request → `{"classification": "...", "confidence": 0.xx, "ocr": {"pages": [...], "fullText": "..."}}` (worker uses this)
-- Env vars: `ML_CLASSIFIER_MODEL`, `ML_OCR_MODEL`, `ML_CANDIDATE_LABELS`, `ML_DEVICE` (`cuda`/`cpu`), `ML_TORCH_DTYPE`, `ML_OCR_MAX_PDF_PAGES`, `ML_HF_HOME`
-- Tests: `pytest` with mocked models — no GPU or Docker needed
+- GPU VRAM: ~2.5GB total (DeBERTa ~870MB + GOT-OCR2 ~1.1GB + CUDA overhead). Docker: `nvidia/cuda:12.6.3-runtime-ubuntu24.04`, `ml_models` volume for HF cache (~4GB)
+- First run downloads ~4GB of model weights from HuggingFace Hub
 
-## Tech Stack Specifics
+## Tech Stack
 
-- **Kotlin 2.2** targeting **JVM 21** with `-Xjsr305=strict` and `-opt-in=kotlin.time.ExperimentalTime`
-- **Gradle version catalog**: all versions in `gradle/libs.versions.toml`, referenced as `libs.*` in build files
-- **Exposed DSL** (not DAO) with `exposed-json` for JSONB and `exposed-kotlin-datetime` for TIMESTAMPTZ
-- **kotlinx.serialization** for JSON (both API DTOs and queue messages) — classes need `@Serializable`
-- **kotlinx.datetime** (`Instant`) for timestamps — not `java.time`
-- **Ktor 3.2.x** with Netty engine (API) and CIO engine (worker HTTP client)
-- **Kotest 6.x** (`FunSpec` style) + **JUnit 5** platform + **Testcontainers** (PostgreSQL + RabbitMQ containers available) + **kotest-extensions-testcontainers** for lifecycle management
-- **MockK** for mocking, **Kotest Property** for property-based tests with `Arb` generators
+**Backend**: Kotlin 2.2, JVM 21, Gradle version catalog (`gradle/libs.versions.toml`), Ktor 3.2 (Netty API / CIO worker client), kotlinx.serialization, kotlinx.datetime, Koin DI, Exposed DSL, Flyway, HikariCP, RabbitMQ, Detekt 1.23.8
+**Frontend**: React 19, TypeScript 5, Vite 6, TanStack Router + Query + Form, Tailwind CSS v4, shadcn/ui, pdfjs-dist + openseadragon, ESLint 9 + Prettier 3
+**ML Service**: Python 3.12, FastAPI, Transformers (DeBERTa-v3-large NLI), GOT-OCR2, PaddleOCR, PyMuPDF, Ruff
+**Testing**: Kotest 6 (FunSpec) + JUnit 5 + Testcontainers + MockK (backend), Vitest + RTL + MSW + Playwright (frontend), pytest (ML)
+**Infrastructure**: PostgreSQL 16, RabbitMQ 4, Docker Compose, NVIDIA CUDA 12.6 (optional)
 
 **Test file convention**: `<module>/src/test/kotlin/org/example/pipeline/<package>/<ClassName>Test.kt`. Stress tests use `<ClassName>StressTest.kt` suffix in the same directory.
 **ML service test convention**: `ml-service/tests/test_<module>.py`. GPU integration tests in `test_gpu_integration.py` are marked `@pytest.mark.gpu` and excluded by default (`addopts = "-m 'not gpu'"` in pyproject.toml). Run with `pytest -m gpu -v`. Module-scoped fixtures for loaded models avoid reloading between tests.
@@ -199,6 +204,7 @@ Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATA
 
 - **`kotlinx.datetime.Instant`** for all domain timestamps, never `java.time`. Exposed 0.57.0 `timestampWithTimeZone` → `java.time.OffsetDateTime` — bridge with `toJavaInstant()`/`toKotlinInstant()` (from `kotlin.time`).
 - **All serialized classes need `@Serializable`** — kotlinx.serialization is compile-time, not reflection-based.
+- **`decodeFromString` can throw `IllegalArgumentException`** — not just `SerializationException`. Catch `Exception` in safety-critical paths (e.g., message consumers that must nack malformed input).
 - **Exposed DSL only** — `exposed-core` + `exposed-jdbc`, not `exposed-dao`. `exposed-dao` exists in version catalog but is intentionally unused.
 - **`Clock.System`** requires `import kotlin.time.Clock` — not `kotlinx.datetime.Clock`.
 - **Avoid Pair/Triple destructuring in lambdas** — K2 reports ambiguous `component1()/component2()`. Use `.first`/`.second`.
@@ -210,6 +216,9 @@ Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATA
 - **Add new dependencies via version catalog** — edit `gradle/libs.versions.toml`, not inline versions.
 - **After changing JDKs**, run `./gradlew --stop` — daemon caches toolchain detection.
 - **If Gradle sync hangs**, delete `.gradle/configuration-cache/`.
+- **Detekt runs with `./gradlew build`** — it hooks into the `check` task. Add `@Suppress("RuleName")` for justified exceptions. Wildcard imports for Exposed, Ktor, RabbitMQ, Kotest, MockK are pre-exempted in config.
+- **KDoc on public APIs is enforced** — Detekt's `UndocumentedPublicClass/Function/Property` rules are active (test files excluded). Add KDoc when creating new public APIs.
+- **Detekt companion objects** — use `private companion object` for constants to avoid `UndocumentedPublicClass` on companion. If public, add KDoc to the companion.
 
 ### Database / Infrastructure
 
@@ -218,28 +227,28 @@ Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATA
 - **Start Docker before running apps** — `docker compose -f docker/docker-compose.yml up -d` must run first.
 - **RabbitMQ topology** — publisher and consumer must declare identical topology via `declareTopology()`.
 - **HikariCP 6.x**: Do NOT set `transactionIsolation` when `isAutoCommit = false` — PostgreSQL rejects isolation changes mid-transaction.
-- **Docker `nvidia/cuda:*-ubuntu24.04`** — has `ubuntu` user at UID 1000 (Dockerfile does `userdel -r ubuntu`). Always verify containers **run**, not just build.
 
 ### Frontend
 
 - **Vite proxy** forwards `/api` to `localhost:8080` — no CORS issues in dev.
 - **`routeTree.gen.ts` is auto-generated** — run `npx @tanstack/router-cli generate` if missing.
-- **shadcn/ui CLI creates literal `@/` directory** — after running, move files to `src/components/ui/` and delete `@/`.
 - **pdfjs-dist v5** — `RenderParameters` requires `canvas` prop; worker must use `?url` import (not CDN).
-- **`src/vite-env.d.ts`** required for Vite `?url`/`?raw` import suffixes to type-check.
 - **Async preview tests** — initial render shows "Loading preview...". Use `findBy*` or test loading state.
 - **Vitest 3.x `vi.fn` generics** — use `vi.fn<(arg: T) => R>()` (single function type). Two-param form removed.
 - **`Promise.allSettled` in TanStack Query** — `onSuccess` always fires. Must inspect per-result `status` for failures.
 - **Radix AlertDialog + async** — use controlled `open`/`onOpenChange` state for dialogs triggering mutations; uncontrolled won't close if page stays mounted.
+- **JSDoc required on exports** — `eslint-plugin-jsdoc` enforces `require-jsdoc` on exported functions, classes, interfaces, and type aliases. Excluded: tests, routes, `components/ui/`, generated files. Use `/** Description. */` (no `@param`/`@returns` — TypeScript types suffice).
+- **Prettier runs separately** — `npm run format:check` verifies, `npm run format` auto-fixes. Config: 100-char width, double quotes, trailing commas.
 
 ### ML Service
 
-- **First run downloads ~4GB** of models from HuggingFace Hub. Set `ML_HF_HOME` to control cache location.
 - **Needs NVIDIA GPU** by default (`ML_DEVICE=cuda`). For CPU: `ML_DEVICE=cpu`, `ML_TORCH_DTYPE=float32`, remove `deploy.resources.reservations` from docker-compose.
 - **Lazy imports for transformers/torch** — MUST be inside `load()` methods, never at module level. Causes SIGBUS on WSL2 without GPU.
 - **PaddleOCR** — lazy load; pinned to 2.x (3.x drops `det`/`rec`/`cls` params); needs `libgl1`/`libglib2.0-0` in Docker.
+- **PaddlePaddle 2.x removed from PyPI** — `pip install -e ".[dev]"` may fail. PaddleOCR 2.x requires `paddlepaddle<3,>=2.6` but only 3.x is available. Install individual dev tools (ruff, pytest) directly if full install fails. Docker build still works (pinned wheels).
 - **OCR bounding boxes** are text region polygons (lines/paragraphs), not per-word boxes.
 - **FastAPI TestClient triggers lifespan** — swap `app.router.lifespan_context` with no-op for tests.
+- **Ruff enforces Google-style docstrings** — all public functions/classes need docstrings. Test files and `__init__.py` are excluded. Run `ruff check app/` and `ruff format --check app/` before committing.
 
 ### Testing
 
@@ -251,47 +260,9 @@ Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATA
 - **SIGBUS can't be caught** — use subprocess probe to detect if `from transformers import pipeline` works.
 - **Mocking uninstalled lazy imports** — inject mock into `sys.modules["paddleocr"]` before `load()`, not `@patch()` (fails with `ModuleNotFoundError`).
 
-## Roadmap (Passes 3–9)
+## Roadmap
 
-Passes 1–2 (security hardening, document viewers + OCR) are complete. Remaining:
-
-### Pass 3: Test Coverage Gaps
-- Frontend E2E tests need Playwright browsers installed (`npx playwright install chromium`) and backend running
-- Frontend integration tests for full page flows (upload → redirect → detail with polling)
-- `DatabaseConfig` — untested init/migration error paths
-- `RabbitMQPublisher.close()` — untested double-close and error scenarios
-- Property-based tests for `Document` domain model validation
-
-### Pass 4: Documentation & Code Quality
-- KDoc on all public APIs (domain interfaces, DTOs, config objects)
-- `@throws` annotations on functions that throw (`IllegalArgumentException` in path traversal, etc.)
-- Error handling consistency — standardize error response format across all routes
-- Logging audit — ensure structured logging with correlation IDs
-
-### Pass 5: Build & DevEx Optimization
-- Gradle configuration cache enablement (currently disabled due to past corruption)
-- Docker Compose health checks for test reliability
-- Test parallelization tuning for Testcontainers (shared containers across specs)
-
-### Pass 6: Observability & Logging
-- Model observability: inference latency, throughput, GPU memory, Prometheus `/metrics` on ML service
-- Structured JSON logging across all services with correlation IDs (upload → queue → worker → ML)
-- Audit trail for document lifecycle events
-
-### Pass 7: Model Explainability
-- Per-label confidence scores (not just top-1) in classification results
-- Attention/token attribution for classification decisions
-- Frontend visualization of confidence distribution across candidate labels
-
-### Pass 8: CI/CD
-- GitHub Actions CI: backend tests (service containers for Postgres/RabbitMQ), frontend type-check + Vitest + build, ML pytest
-- CD pipeline: Docker image builds for app-api, app-worker, ml-service, frontend; push to GHCR; tagged releases
-
-### Pass 9: Log Ingestion & Analytics (Go)
-- New standalone Go service: ingest, parse, store, and visualize logs from all pipeline components
-- Sources: app-api, app-worker, ml-service, PostgreSQL, RabbitMQ logs
-- Dashboard with real-time log stream, per-service health, correlation ID trace view
-- Depends on Pass 6 (structured logging) landing first
+Passes 1–4 complete (security, OCR viewers, test coverage, linting). See `README.md` Roadmap table for passes 5–9.
 
 ## Automations
 

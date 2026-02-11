@@ -14,6 +14,7 @@ const ThemeProviderContext = createContext<ThemeProviderState>({
 
 const STORAGE_KEY = "document-pipeline-theme";
 
+/** Context provider that manages and persists the application color theme. */
 export function ThemeProvider({
   children,
   defaultTheme = "dark",
@@ -22,7 +23,7 @@ export function ThemeProvider({
   defaultTheme?: Theme;
 }) {
   const [theme, setTheme] = useState<Theme>(
-    () => (localStorage.getItem(STORAGE_KEY) as Theme) || defaultTheme
+    () => (localStorage.getItem(STORAGE_KEY) as Theme) || defaultTheme,
   );
 
   useEffect(() => {
@@ -30,8 +31,7 @@ export function ThemeProvider({
     root.classList.remove("light", "dark");
 
     if (theme === "system") {
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
-        .matches
+      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches
         ? "dark"
         : "light";
       root.classList.add(systemTheme);
@@ -48,16 +48,12 @@ export function ThemeProvider({
     },
   };
 
-  return (
-    <ThemeProviderContext.Provider value={value}>
-      {children}
-    </ThemeProviderContext.Provider>
-  );
+  return <ThemeProviderContext.Provider value={value}>{children}</ThemeProviderContext.Provider>;
 }
 
+/** Hook to access the current theme and theme setter from ThemeProvider. */
 export function useTheme() {
   const context = useContext(ThemeProviderContext);
-  if (context === undefined)
-    throw new Error("useTheme must be used within a ThemeProvider");
+  if (context === undefined) throw new Error("useTheme must be used within a ThemeProvider");
   return context;
 }

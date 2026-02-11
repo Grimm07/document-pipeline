@@ -7,7 +7,7 @@ import io.ktor.server.config.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import io.ktor.utils.io.*
+import io.ktor.utils.io.toByteArray
 import org.example.pipeline.api.dto.*
 import org.example.pipeline.domain.Document
 import org.example.pipeline.domain.DocumentRepository
@@ -19,9 +19,19 @@ import kotlin.time.Clock
 
 private val logger = LoggerFactory.getLogger("DocumentRoutes")
 
+/** Default maximum upload file size: 50 MB. */
+private const val DEFAULT_MAX_FILE_SIZE = 50L * 1024 * 1024
+
+/** Default page size for document list queries. */
+private const val DEFAULT_PAGE_SIZE = 50
+
 /**
- * Registers document-related API routes.
+ * Registers document-related API routes under `/api/documents`.
+ *
+ * Provides endpoints for upload, list, search, detail, download, OCR results,
+ * delete, and retry classification.
  */
+@Suppress("LongMethod", "CyclomaticComplexMethod") // Route registration is inherently long and branchy
 fun Application.documentRoutes() {
     val documentRepository by inject<DocumentRepository>()
     val fileStorageService by inject<FileStorageService>()
@@ -29,7 +39,7 @@ fun Application.documentRoutes() {
     val config by inject<HoconApplicationConfig>()
 
     val maxFileSize = config.propertyOrNull("upload.maxFileSizeBytes")
-        ?.getString()?.toLongOrNull() ?: (50L * 1024 * 1024)
+        ?.getString()?.toLongOrNull() ?: DEFAULT_MAX_FILE_SIZE
 
     routing {
         route("/api/documents") {
@@ -57,7 +67,8 @@ fun Application.documentRoutes() {
                     part.dispose()
                 }
 
-                if (fileBytes == null) {
+                val bytes = fileBytes
+                if (bytes == null) {
                     call.respond(HttpStatusCode.BadRequest, ErrorResponse("No file provided"))
                     return@post
                 }
@@ -66,7 +77,6 @@ fun Application.documentRoutes() {
                 val now = Clock.System.now()
                 val actualFilename = filename ?: "unknown"
                 val actualMimeType = mimeType ?: "application/octet-stream"
-                val bytes = fileBytes!!
 
                 val storagePath = fileStorageService.store(id, actualFilename, bytes)
 
@@ -94,11 +104,15 @@ fun Application.documentRoutes() {
                     .associate { it.key.removePrefix("metadata.") to it.value.first() }
 
                 if (metadataParams.isEmpty()) {
-                    call.respond(HttpStatusCode.BadRequest, ErrorResponse("At least one metadata.* query parameter is required"))
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        ErrorResponse("At least one metadata.* query parameter is required")
+                    )
                     return@get
                 }
 
-                val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 50
+                val limit = call.request.queryParameters["limit"]?.toIntOrNull()
+                    ?: DEFAULT_PAGE_SIZE
                 val documents = documentRepository.searchMetadata(metadataParams, limit)
                 val response = DocumentListResponse(
                     documents = documents.map { it.toResponse() },
@@ -111,36 +125,53 @@ fun Application.documentRoutes() {
 
             get("/{id}/ocr") {
                 val idParam = call.parameters["id"]
-                    ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("Missing document ID"))
+                    ?: return@get call.respond(
+                        HttpStatusCode.BadRequest, ErrorResponse("Missing document ID")
+                    )
 
                 val document = documentRepository.getById(idParam)
                 if (document == null) {
-                    call.respond(HttpStatusCode.NotFound, ErrorResponse("Document not found: $idParam"))
+                    call.respond(
+                        HttpStatusCode.NotFound,
+                        ErrorResponse("Document not found: $idParam")
+                    )
                     return@get
                 }
 
                 val ocrPath = document.ocrStoragePath
                 if (ocrPath == null) {
-                    call.respond(HttpStatusCode.NotFound, ErrorResponse("No OCR results for document: $idParam"))
+                    call.respond(
+                        HttpStatusCode.NotFound,
+                        ErrorResponse("No OCR results for document: $idParam")
+                    )
                     return@get
                 }
 
                 val bytes = fileStorageService.retrieve(ocrPath)
                 if (bytes == null) {
-                    call.respond(HttpStatusCode.NotFound, ErrorResponse("OCR file not found for document: $idParam"))
+                    call.respond(
+                        HttpStatusCode.NotFound,
+                        ErrorResponse("OCR file not found for document: $idParam")
+                    )
                     return@get
                 }
 
                 call.respondBytes(bytes, ContentType.Application.Json)
             }
 
+            @Suppress("TooGenericExceptionCaught") // File deletion must not fail the request
             delete("/{id}") {
                 val idParam = call.parameters["id"]
-                    ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("Missing document ID"))
+                    ?: return@delete call.respond(
+                        HttpStatusCode.BadRequest, ErrorResponse("Missing document ID")
+                    )
 
                 val document = documentRepository.getById(idParam)
                 if (document == null) {
-                    call.respond(HttpStatusCode.NotFound, ErrorResponse("Document not found: $idParam"))
+                    call.respond(
+                        HttpStatusCode.NotFound,
+                        ErrorResponse("Document not found: $idParam")
+                    )
                     return@delete
                 }
 
@@ -148,14 +179,20 @@ fun Application.documentRoutes() {
                 try {
                     fileStorageService.delete(document.storagePath)
                 } catch (e: Exception) {
-                    logger.warn("Failed to delete stored file for {}: {}", idParam, e.message)
+                    logger.warn(
+                        "Failed to delete stored file for {}: {}",
+                        idParam, e.message
+                    )
                 }
                 val ocrPath = document.ocrStoragePath
                 if (ocrPath != null) {
                     try {
                         fileStorageService.delete(ocrPath)
                     } catch (e: Exception) {
-                        logger.warn("Failed to delete OCR file for {}: {}", idParam, e.message)
+                        logger.warn(
+                            "Failed to delete OCR file for {}: {}",
+                            idParam, e.message
+                        )
                     }
                 }
 
@@ -163,13 +200,19 @@ fun Application.documentRoutes() {
                 call.respond(HttpStatusCode.NoContent)
             }
 
+            @Suppress("TooGenericExceptionCaught") // File deletion must not fail the request
             post("/{id}/retry") {
                 val idParam = call.parameters["id"]
-                    ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Missing document ID"))
+                    ?: return@post call.respond(
+                        HttpStatusCode.BadRequest, ErrorResponse("Missing document ID")
+                    )
 
                 val document = documentRepository.getById(idParam)
                 if (document == null) {
-                    call.respond(HttpStatusCode.NotFound, ErrorResponse("Document not found: $idParam"))
+                    call.respond(
+                        HttpStatusCode.NotFound,
+                        ErrorResponse("Document not found: $idParam")
+                    )
                     return@post
                 }
 
@@ -179,7 +222,10 @@ fun Application.documentRoutes() {
                     try {
                         fileStorageService.delete(ocrPath)
                     } catch (e: Exception) {
-                        logger.warn("Failed to delete OCR file during retry for {}: {}", idParam, e.message)
+                        logger.warn(
+                            "Failed to delete OCR file during retry for {}: {}",
+                            idParam, e.message
+                        )
                     }
                 }
 
@@ -188,7 +234,10 @@ fun Application.documentRoutes() {
 
                 val updated = documentRepository.getById(idParam)
                 if (updated == null) {
-                    call.respond(HttpStatusCode.NotFound, ErrorResponse("Document not found: $idParam"))
+                    call.respond(
+                        HttpStatusCode.NotFound,
+                        ErrorResponse("Document not found: $idParam")
+                    )
                     return@post
                 }
                 call.respond(HttpStatusCode.OK, updated.toResponse())
@@ -196,11 +245,16 @@ fun Application.documentRoutes() {
 
             get("/{id}") {
                 val idParam = call.parameters["id"]
-                    ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("Missing document ID"))
+                    ?: return@get call.respond(
+                        HttpStatusCode.BadRequest, ErrorResponse("Missing document ID")
+                    )
 
                 val document = documentRepository.getById(idParam)
                 if (document == null) {
-                    call.respond(HttpStatusCode.NotFound, ErrorResponse("Document not found: $idParam"))
+                    call.respond(
+                        HttpStatusCode.NotFound,
+                        ErrorResponse("Document not found: $idParam")
+                    )
                     return@get
                 }
 
@@ -209,24 +263,33 @@ fun Application.documentRoutes() {
 
             get("/{id}/download") {
                 val idParam = call.parameters["id"]
-                    ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("Missing document ID"))
+                    ?: return@get call.respond(
+                        HttpStatusCode.BadRequest, ErrorResponse("Missing document ID")
+                    )
 
                 val document = documentRepository.getById(idParam)
                 if (document == null) {
-                    call.respond(HttpStatusCode.NotFound, ErrorResponse("Document not found: $idParam"))
+                    call.respond(
+                        HttpStatusCode.NotFound,
+                        ErrorResponse("Document not found: $idParam")
+                    )
                     return@get
                 }
 
                 val bytes = fileStorageService.retrieve(document.storagePath)
                 if (bytes == null) {
-                    call.respond(HttpStatusCode.NotFound, ErrorResponse("File not found for document: $idParam"))
+                    call.respond(
+                        HttpStatusCode.NotFound,
+                        ErrorResponse("File not found for document: $idParam")
+                    )
                     return@get
                 }
 
                 call.response.header(
                     HttpHeaders.ContentDisposition,
                     ContentDisposition.Attachment.withParameter(
-                        ContentDisposition.Parameters.FileName, document.originalFilename
+                        ContentDisposition.Parameters.FileName,
+                        document.originalFilename
                     ).toString()
                 )
                 call.respondBytes(bytes, ContentType.parse(document.mimeType))
@@ -234,7 +297,8 @@ fun Application.documentRoutes() {
 
             get {
                 val classification = call.request.queryParameters["classification"]
-                val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 50
+                val limit = call.request.queryParameters["limit"]?.toIntOrNull()
+                    ?: DEFAULT_PAGE_SIZE
                 val offset = call.request.queryParameters["offset"]?.toIntOrNull() ?: 0
 
                 val documents = documentRepository.list(classification, limit, offset)

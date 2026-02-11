@@ -1,3 +1,5 @@
+"""Document processing pipeline orchestrating classification and OCR services."""
+
 import base64
 import io
 import logging
@@ -14,6 +16,12 @@ logger = logging.getLogger(__name__)
 
 
 class DocumentPipeline:
+    """Orchestrates document classification, OCR, and bounding box detection.
+
+    Decodes base64 content, routes to the appropriate extraction strategy
+    based on MIME type, and delegates to classifier/OCR/bbox services.
+    """
+
     def __init__(
         self,
         classifier: ClassifierService,
@@ -22,15 +30,32 @@ class DocumentPipeline:
         ocr_max_pdf_pages: int,
         bbox_extractor: BBoxExtractor | None = None,
     ) -> None:
+        """Initialize the pipeline with its service dependencies.
+
+        Args:
+            classifier: Zero-shot classification service.
+            ocr: OCR text extraction service.
+            candidate_labels: Document type labels for classification.
+            ocr_max_pdf_pages: Maximum PDF pages to process.
+            bbox_extractor: Optional bounding box detector.
+        """
         self._classifier = classifier
         self._ocr = ocr
         self._candidate_labels = candidate_labels
         self._ocr_max_pdf_pages = ocr_max_pdf_pages
         self._bbox_extractor = bbox_extractor
 
-    def classify_document(
-        self, content_b64: str, mime_type: str
-    ) -> tuple[str, float]:
+    def classify_document(self, content_b64: str, mime_type: str) -> tuple[str, float]:
+        """Classify a document and return the top label with confidence.
+
+        Args:
+            content_b64: Base64-encoded document bytes.
+            mime_type: MIME type of the document.
+
+        Returns:
+            Tuple of (label, confidence_score). Returns ("unknown", 0.0) if
+            no text can be extracted.
+        """
         raw_bytes = base64.b64decode(content_b64)
         text = self._extract_text(raw_bytes, mime_type)
 
@@ -47,6 +72,14 @@ class DocumentPipeline:
 
         For PDFs and images, returns full OCR data including per-page text
         and bounding boxes. For text/* types, returns None for OCR.
+
+        Args:
+            content_b64: Base64-encoded document bytes.
+            mime_type: MIME type of the document.
+
+        Returns:
+            Tuple of (label, confidence_score, ocr_result). OCR result is None
+            for non-visual document types.
         """
         raw_bytes = base64.b64decode(content_b64)
         mime_lower = mime_type.lower()
@@ -63,12 +96,8 @@ class DocumentPipeline:
             label, score = self._classifier.classify(text, self._candidate_labels)
             return (label, score, None)
 
-    def _classify_pdf_with_ocr(
-        self, raw_bytes: bytes
-    ) -> tuple[str, float, OcrResult | None]:
-        page_data = pdf_bytes_to_images_with_dims(
-            raw_bytes, max_pages=self._ocr_max_pdf_pages
-        )
+    def _classify_pdf_with_ocr(self, raw_bytes: bytes) -> tuple[str, float, OcrResult | None]:
+        page_data = pdf_bytes_to_images_with_dims(raw_bytes, max_pages=self._ocr_max_pdf_pages)
         if not page_data:
             return ("unknown", 0.0, None)
 
@@ -81,10 +110,15 @@ class DocumentPipeline:
                 all_texts.append(page_text)
 
             blocks = self._detect_blocks(img, page_text)
-            pages.append(OcrPage(
-                pageIndex=i, width=w, height=h,
-                text=page_text, blocks=blocks,
-            ))
+            pages.append(
+                OcrPage(
+                    pageIndex=i,
+                    width=w,
+                    height=h,
+                    text=page_text,
+                    blocks=blocks,
+                )
+            )
 
         full_text = "\n\n".join(all_texts)
         if not full_text.strip():
@@ -93,19 +127,22 @@ class DocumentPipeline:
         label, score = self._classifier.classify(full_text, self._candidate_labels)
         return (label, score, OcrResult(pages=pages, fullText=full_text))
 
-    def _classify_image_with_ocr(
-        self, raw_bytes: bytes
-    ) -> tuple[str, float, OcrResult | None]:
+    def _classify_image_with_ocr(self, raw_bytes: bytes) -> tuple[str, float, OcrResult | None]:
         image = Image.open(io.BytesIO(raw_bytes)).convert("RGB")
         w, h = image.size
         page_text = self._ocr.extract_text(image)
 
         blocks = self._detect_blocks(image, page_text)
         ocr_result = OcrResult(
-            pages=[OcrPage(
-                pageIndex=0, width=w, height=h,
-                text=page_text, blocks=blocks,
-            )],
+            pages=[
+                OcrPage(
+                    pageIndex=0,
+                    width=w,
+                    height=h,
+                    text=page_text,
+                    blocks=blocks,
+                )
+            ],
             fullText=page_text,
         )
 
@@ -155,9 +192,7 @@ class DocumentPipeline:
             return raw_bytes.decode("latin-1")
 
     def _extract_from_pdf(self, raw_bytes: bytes) -> str:
-        images = pdf_bytes_to_images(
-            raw_bytes, max_pages=self._ocr_max_pdf_pages
-        )
+        images = pdf_bytes_to_images(raw_bytes, max_pages=self._ocr_max_pdf_pages)
         if not images:
             return ""
         return self._ocr.extract_text_from_images(images)

@@ -30,10 +30,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
 
 describe("BoundingBoxViewer", () => {
   it("shows loading state while fetching OCR data", () => {
-    render(
-      <BoundingBoxViewer documentId="test-id" mimeType="application/pdf" />,
-      { wrapper }
-    );
+    render(<BoundingBoxViewer documentId="test-id" mimeType="application/pdf" />, { wrapper });
     expect(screen.getByText("Loading OCR data...")).toBeInTheDocument();
   });
 });

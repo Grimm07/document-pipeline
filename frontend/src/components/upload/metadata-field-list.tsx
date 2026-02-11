@@ -9,11 +9,8 @@ interface MetadataFieldListProps {
   disabled?: boolean;
 }
 
-export function MetadataFieldList({
-  entries,
-  onChange,
-  disabled,
-}: MetadataFieldListProps) {
+/** Editable list of key-value metadata fields for document uploads. */
+export function MetadataFieldList({ entries, onChange, disabled }: MetadataFieldListProps) {
   const addEntry = () => {
     onChange([...entries, { key: "", value: "" }]);
   };
@@ -22,13 +19,9 @@ export function MetadataFieldList({
     onChange(entries.filter((_, i) => i !== index));
   };
 
-  const updateEntry = (
-    index: number,
-    field: "key" | "value",
-    newValue: string
-  ) => {
+  const updateEntry = (index: number, field: "key" | "value", newValue: string) => {
     const updated = entries.map((entry, i) =>
-      i === index ? { ...entry, [field]: newValue } : entry
+      i === index ? { ...entry, [field]: newValue } : entry,
     );
     onChange(updated);
   };
@@ -37,13 +30,7 @@ export function MetadataFieldList({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <label className="text-sm font-medium">Metadata</label>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={addEntry}
-          disabled={disabled}
-        >
+        <Button type="button" variant="ghost" size="sm" onClick={addEntry} disabled={disabled}>
           <Plus className="size-4 mr-1" />
           Add Field
         </Button>

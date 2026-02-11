@@ -18,6 +18,7 @@ junit = "5.11.3"
 kotest = "6.1.2"
 mockk = "1.14.9"
 testcontainers = "1.20.4"
+detekt = "1.23.8"
 [libraries]
 # Kotlin
 kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
@@ -96,3 +97,4 @@ testcontainers = ["testcontainers-core", "testcontainers-junit", "testcontainers
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ktor = { id = "io.ktor.plugin", version.ref = "ktor" }
+detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }

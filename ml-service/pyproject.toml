@@ -28,6 +28,7 @@ dev = [
     "pytest-asyncio>=0.25.0",
     "httpx>=0.28.0",
     "pytest-cov>=6.0.0",
+    "ruff>=0.11.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -40,3 +41,39 @@ addopts = "-m 'not gpu'"
 markers = [
     "gpu: requires CUDA GPU and downloaded model weights (deselected by default, run with: pytest -m gpu)",
 ]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "D",    # pydocstyle — docstring enforcement
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes — unused imports, undefined names
+    "I",    # isort — import sorting
+    "B",    # flake8-bugbear — common bug patterns
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade — modern Python patterns
+    "SIM",  # flake8-simplify
+    "RUF",  # Ruff-specific rules
+]
+ignore = [
+    "D100",  # Missing module docstring (empty __init__.py files)
+    "D104",  # Missing package docstring
+    "D203",  # Conflicts with D211
+    "D213",  # Conflicts with D212
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["D", "B011", "SIM300"]
+"app/__init__.py" = ["D"]
+"app/services/__init__.py" = ["D"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
