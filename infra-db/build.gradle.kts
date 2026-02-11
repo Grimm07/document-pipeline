@@ -1,5 +1,5 @@
 plugins {
-    alias(libs.plugins.kotlin.jvm)
+    id("pipeline-conventions")
     alias(libs.plugins.kotlin.serialization)
 }
 
