@@ -66,6 +66,17 @@ services:
     networks:
       - pipeline-network
 
+  # Future services (Pass 8: CI/CD):
+  # api:
+  #   depends_on:
+  #     postgres: { condition: service_healthy }
+  #     rabbitmq: { condition: service_healthy }
+  # worker:
+  #   depends_on:
+  #     postgres: { condition: service_healthy }
+  #     rabbitmq: { condition: service_healthy }
+  #     ml-service: { condition: service_healthy }
+
 volumes:
   postgres_data:
   rabbitmq_data:
