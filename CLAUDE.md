@@ -116,6 +116,25 @@ cd frontend && npm run format:check
 
 # Auto-fix TypeScript formatting
 cd frontend && npm run format
+
+# --- Changelog ---
+
+# Regenerate changelog (picks up git tags automatically)
+git-cliff --output CHANGELOG.md
+
+# Label unreleased commits as a version (before creating a git tag)
+git-cliff --tag v0.2.0 --output CHANGELOG.md
+
+# --- Git Hooks ---
+
+# Install git hooks (required once after cloning)
+lefthook install
+
+# Validate a commit message manually
+echo "feat: test message" | cog verify
+
+# Check full history for conventional commit compliance
+cog check
 ```
 
 **Quick start**: `docker compose -f docker/docker-compose.yml up -d && ./gradlew build`
@@ -183,7 +202,7 @@ Note the DI asymmetry: API module is a top-level `val`; worker module is a funct
 **Frontend**: React 19, TypeScript 5, Vite 6, TanStack Router + Query + Form, Tailwind CSS v4, shadcn/ui, pdfjs-dist + openseadragon, ESLint 9 + Prettier 3
 **ML Service**: Python 3.12, FastAPI, Transformers (DeBERTa-v3-large NLI), GOT-OCR2, PaddleOCR, PyMuPDF, Ruff
 **Testing**: Kotest 6 (FunSpec) + JUnit 5 + Testcontainers + MockK (backend), Vitest + RTL + MSW + Playwright (frontend), pytest (ML)
-**Infrastructure**: PostgreSQL 16, RabbitMQ 4, Docker Compose, NVIDIA CUDA 12.6 (optional)
+**Infrastructure**: PostgreSQL 16, RabbitMQ 4, Docker Compose, NVIDIA CUDA 12.6 (optional), git-cliff (changelog), Lefthook, Cocogitto (commit linting)
 
 **Test file convention**: `<module>/src/test/kotlin/org/example/pipeline/<package>/<ClassName>Test.kt`. Stress tests use `<ClassName>StressTest.kt` suffix in the same directory.
 **ML service test convention**: `ml-service/tests/test_<module>.py`. GPU integration tests in `test_gpu_integration.py` are marked `@pytest.mark.gpu` and excluded by default (`addopts = "-m 'not gpu'"` in pyproject.toml). Run with `pytest -m gpu -v`. Module-scoped fixtures for loaded models avoid reloading between tests.
@@ -196,7 +215,9 @@ Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATA
 
 - **Remote**: `git@github.com:Grimm07/document-pipeline.git` (origin)
 - **Branch**: `main` — all work currently on main (no feature branch convention yet)
-- **Commit style**: imperative subject line, bullet-point body for multi-topic commits
+- **Commit style**: conventional commits required (`feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `perf:`, `chore:`, `ci:`, `style:`) — these feed the auto-generated changelog
+- **Commit linting**: Enforced by Lefthook + Cocogitto `commit-msg` hook. Run `lefthook install` after cloning.
+- **Changelog**: auto-generated via [git-cliff](https://git-cliff.org) from conventional commits. Config in `cliff.toml`. Regenerate with `git-cliff --output CHANGELOG.md`
 
 ## Gotchas
 
@@ -241,6 +262,23 @@ Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATA
 - **JSDoc required on exports** — `eslint-plugin-jsdoc` enforces `require-jsdoc` on exported functions, classes, interfaces, and type aliases. Excluded: tests, routes, `components/ui/`, generated files. Use `/** Description. */` (no `@param`/`@returns` — TypeScript types suffice).
 - **Prettier runs separately** — `npm run format:check` verifies, `npm run format` auto-fixes. Config: 100-char width, double quotes, trailing commas.
 
+### Changelog
+
+- **git-cliff has no `--dry-run`** — omit the `-o` flag to preview to stdout instead.
+- **`cliff.toml` preprocessors truncate to first line** — intentional; older freeform commits have multi-paragraph bodies that would flood the changelog. Don't remove the `'\n[\s\S]*'` preprocessor.
+- **`--tag v0.x.0`** labels unreleased commits as a version in the output without creating a git tag. Once a real tag exists, plain `git-cliff --output CHANGELOG.md` picks it up automatically.
+- **Claude session URLs and Co-Authored-By trailers are scrubbed** — `cliff.toml` has preprocessors + a postprocessor safety net. Do not remove these.
+- **Preprocessor ordering matters** — scrubs first, then first-line truncation, then link replacements. Parenthesized `(#N)` before bare `#N` to avoid double-matching.
+
+### Git Hooks
+
+- **All commits are validated** — including commits made by Claude Code. The hook runs `cog verify` on every commit message. Always use conventional format.
+- **`lefthook install` required after cloning** — writes shims to `.git/hooks/`, not tracked by git.
+- **`cog check` flags old freeform commits** — expected, only new commits are enforced by the hook.
+- **`lefthook-local.yml`** for developer-specific overrides (gitignored).
+- **Cocogitto does NOT manage changelog** — git-cliff does that (`disable_changelog = true` in `cog.toml`).
+- **Claude Code hooks** (`.claude/settings.json`) are separate — they operate at agent level, not git level.
+
 ### ML Service
 
 - **Needs NVIDIA GPU** by default (`ML_DEVICE=cuda`). For CPU: `ML_DEVICE=cpu`, `ML_TORCH_DTYPE=float32`, remove `deploy.resources.reservations` from docker-compose.
@@ -260,10 +298,6 @@ Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATA
 - **Two-tier ML mocking** — unit tests mock internals (`service._pipeline = MagicMock()`); pipeline tests use `create_autospec()`. Don't mix.
 - **SIGBUS can't be caught** — use subprocess probe to detect if `from transformers import pipeline` works.
 - **Mocking uninstalled lazy imports** — inject mock into `sys.modules["paddleocr"]` before `load()`, not `@patch()` (fails with `ModuleNotFoundError`).
-
-## Roadmap
-
-Passes 1–4 complete (security, OCR viewers, test coverage, linting). See `README.md` Roadmap table for passes 5–9.
 
 ## Automations
 

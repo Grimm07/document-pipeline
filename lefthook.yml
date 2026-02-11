@@ -1,0 +1,9 @@
+# Lefthook — git hooks manager
+# https://lefthook.dev/
+#
+# Run `lefthook install` once after cloning to activate hooks.
+
+commit-msg:
+  commands:
+    validate-conventional-commit:
+      run: cog verify --file {1}

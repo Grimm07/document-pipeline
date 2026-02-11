@@ -55,6 +55,9 @@ test-output/
 # Claude Code local settings (personal permissions)
 .claude/settings.local.json
 
+# Lefthook local overrides (developer-specific)
+lefthook-local.yml
+
 # Frontend
 frontend/node_modules/
 frontend/dist/

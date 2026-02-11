@@ -142,7 +142,7 @@ For CPU-only mode, set `ML_DEVICE=cpu` and `ML_TORCH_DTYPE=float32` in the envir
 
 **ML Service** — Python 3.12, FastAPI, Uvicorn, Transformers, PyTorch, PaddleOCR, PyMuPDF, Pydantic Settings, **Ruff** (linting/formatting)
 
-**Infrastructure** — PostgreSQL 16, RabbitMQ 4, Docker Compose, NVIDIA CUDA 12.6 (optional)
+**Infrastructure** — PostgreSQL 16, RabbitMQ 4, Docker Compose, NVIDIA CUDA 12.6 (optional), Lefthook (git hooks), Cocogitto (commit linting)
 
 ## Testing
 
@@ -187,6 +187,34 @@ cd frontend && npm run format:check    # Prettier format check
 | TypeScript | ESLint 9 + Prettier | `frontend/eslint.config.js` + `.prettierrc` | JSDoc on exports, React hooks rules, consistent formatting |
 
 Test files are excluded from documentation rules across all stacks. Auto-fix commands: `./gradlew detekt` (reports only), `cd ml-service && ruff check --fix app/ && ruff format app/`, `cd frontend && npm run lint:fix && npm run format`.
+
+## Commit Conventions
+
+Commit messages are validated against [Conventional Commits](https://www.conventionalcommits.org/) by a [Lefthook](https://lefthook.dev/) + [Cocogitto](https://docs.cocogitto.io/) `commit-msg` hook.
+
+**Setup** (once per clone):
+
+```bash
+lefthook install
+```
+
+**Format**: `type(optional-scope): description`
+
+**Allowed types**: `feat`, `fix`, `refactor`, `perf`, `docs`, `test`, `style`, `chore`, `ci`, `revert`, `build`
+
+Breaking changes use `!` after type/scope (e.g., `refactor!: rename API`). See [Conventional Commits spec](https://www.conventionalcommits.org/) for details.
+
+## Changelog
+
+Auto-generated from conventional commits using [git-cliff](https://git-cliff.org). See [CHANGELOG.md](CHANGELOG.md).
+
+```bash
+# Regenerate changelog (after creating a git tag)
+git-cliff --output CHANGELOG.md
+
+# Regenerate with a version label (before tagging)
+git-cliff --tag v0.2.0 --output CHANGELOG.md
+```
 
 ## Configuration
 
