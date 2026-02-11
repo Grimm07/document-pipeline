@@ -230,6 +230,7 @@ Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATA
 
 ### Frontend
 
+- **ESLint 10 upgrade blocked** (evaluated 2026-02) — `typescript-eslint`, `eslint-plugin-jsdoc`, and `eslint-plugin-react-hooks` all cap peer deps at ESLint 9. Track [typescript-eslint#11952](https://github.com/typescript-eslint/typescript-eslint/issues/11952) — once that ships, upgrade all together. No config changes needed (already on flat config).
 - **Vite proxy** forwards `/api` to `localhost:8080` — no CORS issues in dev.
 - **`routeTree.gen.ts` is auto-generated** — run `npx @tanstack/router-cli generate` if missing.
 - **pdfjs-dist v5** — `RenderParameters` requires `canvas` prop; worker must use `?url` import (not CDN).
