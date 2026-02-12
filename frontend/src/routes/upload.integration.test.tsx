@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider, createRouter, createMemoryHistory } from "@tanstack/react-router";
@@ -12,10 +11,15 @@ import { routeTree } from "@/routeTree.gen";
 
 // Mock uploadDocument to avoid XHR — jsdom's XMLHttpRequest is not reliably
 // intercepted by MSW's Node interceptor in CI environments.
-const mockUploadDocument = vi.fn<(file: File, metadata: Record<string, string>) => Promise<unknown>>();
+const mockUploadDocument =
+  vi.fn<(file: File, metadata: Record<string, string>) => Promise<unknown>>();
 vi.mock("@/lib/api/documents", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/api/documents")>();
-  return { ...original, uploadDocument: (...args: unknown[]) => mockUploadDocument(args[0] as File, args[1] as Record<string, string>) };
+  return {
+    ...original,
+    uploadDocument: (...args: unknown[]) =>
+      mockUploadDocument(args[0] as File, args[1] as Record<string, string>),
+  };
 });
 
 // Mock heavy PDF/viewer deps that are loaded transitively via the route tree
