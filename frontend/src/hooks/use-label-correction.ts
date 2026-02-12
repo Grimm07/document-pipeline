@@ -11,6 +11,7 @@ export function useLabelCorrection(id: string) {
     onSuccess: (data) => {
       queryClient.setQueryData(documentKeys.detail(id), data);
       queryClient.invalidateQueries({ queryKey: documentKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: documentKeys.detail(id) });
     },
   });
 }

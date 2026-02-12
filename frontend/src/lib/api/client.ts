@@ -15,12 +15,13 @@ const BASE_URL = "/api";
 
 /** Typed fetch wrapper that prepends the API base URL and handles errors. */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const { headers: initHeaders, ...rest } = init ?? {};
   const response = await fetch(`${BASE_URL}${path}`, {
     headers: {
       Accept: "application/json",
-      ...init?.headers,
+      ...initHeaders,
     },
-    ...init,
+    ...rest,
   });
 
   if (!response.ok) {
