@@ -7,7 +7,16 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider, createRouter, createMemoryHistory } from "@tanstack/react-router";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import { handlers } from "@/test/mocks/handlers";
+import { createMockDocument } from "@/test/fixtures";
 import { routeTree } from "@/routeTree.gen";
+
+// Mock uploadDocument to avoid XHR — jsdom's XMLHttpRequest is not reliably
+// intercepted by MSW's Node interceptor in CI environments.
+const mockUploadDocument = vi.fn<(file: File, metadata: Record<string, string>) => Promise<unknown>>();
+vi.mock("@/lib/api/documents", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/lib/api/documents")>();
+  return { ...original, uploadDocument: (...args: unknown[]) => mockUploadDocument(args[0] as File, args[1] as Record<string, string>) };
+});
 
 // Mock heavy PDF/viewer deps that are loaded transitively via the route tree
 vi.mock("pdfjs-dist", () => ({
@@ -52,7 +61,10 @@ vi.mock("openseadragon", () => ({
 
 const server = setupServer(...handlers);
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  mockUploadDocument.mockReset();
+});
 afterAll(() => server.close());
 
 function renderUploadPage() {
@@ -124,6 +136,7 @@ describe("Upload Page Integration", () => {
   });
 
   it("successful upload navigates to detail page", { timeout: 15000 }, async () => {
+    mockUploadDocument.mockResolvedValue(createMockDocument({ id: "new-upload-001" }));
     const user = userEvent.setup();
     renderUploadPage();
 
@@ -155,11 +168,7 @@ describe("Upload Page Integration", () => {
   });
 
   it("shows error message on upload failure", { timeout: 15000 }, async () => {
-    server.use(
-      http.post("/api/documents/upload", () => {
-        return HttpResponse.json({ error: "Internal Server Error" }, { status: 500 });
-      }),
-    );
+    mockUploadDocument.mockRejectedValue(new Error("Internal Server Error"));
 
     const user = userEvent.setup();
     renderUploadPage();
