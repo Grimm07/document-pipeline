@@ -257,6 +257,7 @@ Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATA
 
 ### Database / Infrastructure
 
+- **Rebuild Docker images after dependency changes** — `docker compose up -d` does NOT rebuild images. After adding packages to `pyproject.toml` or other dependency files, run `docker compose -f docker/docker-compose.yml build <service>` (or `up -d --build`). Stale images will silently lack new packages.
 - **Never document credential defaults in README or public docs** — they exist in `application.conf` and `docker-compose.yml` for local dev, but don't repeat values like passwords in documentation.
 - **Never edit existing Flyway migrations** — create `V{N+1}__` instead. Applied migrations are immutable.
 - **Start Docker before running apps** — `docker compose -f docker/docker-compose.yml up -d` must run first.
@@ -280,6 +281,7 @@ Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATA
 
 ### Changelog
 
+- **Generate changelog AFTER committing** — `git-cliff` reads git history, so the commit must exist first. Correct order: commit → `git tag vX.Y.Z` → `git-cliff --output CHANGELOG.md` → commit changelog separately.
 - **git-cliff has no `--dry-run`** — omit the `-o` flag to preview to stdout instead.
 - **`cliff.toml` preprocessors truncate to first line** — intentional; older freeform commits have multi-paragraph bodies that would flood the changelog. Don't remove the `'\n[\s\S]*'` preprocessor.
 - **`--tag v0.x.0`** labels unreleased commits as a version in the output without creating a git tag. Once a real tag exists, plain `git-cliff --output CHANGELOG.md` picks it up automatically.
