@@ -251,12 +251,16 @@ Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATA
 - **Micrometer 1.14+ package rename** — use `io.micrometer.prometheusmetrics.PrometheusMeterRegistry` and `PrometheusConfig`, NOT the old `io.micrometer.prometheus` package (won't compile).
 - **MDC is thread-local, coroutines switch threads** — Ktor `CallLogging` plugin handles MDC per-request automatically. Worker uses `runBlocking` (same thread), so MDC is safe there. Do NOT use MDC in `suspend` functions launched with `Dispatchers.IO` without explicit MDC context propagation.
 - **Worker metrics port** — configurable via `WORKER_METRICS_PORT` env var (default 8081). Uses JDK `com.sun.net.httpserver.HttpServer` — zero extra dependencies.
-- **`host.docker.internal` on Linux** — requires `extra_hosts: ["host.docker.internal:host-gateway"]` in docker-compose (Docker 20.10+). Prometheus scrapes host-running API/Worker via this.
+- **JDK `HttpServer` must bind `"0.0.0.0"` explicitly** — `InetSocketAddress(port)` without a host binds to `::` (IPv6) on JDK 21. Docker containers connect via IPv4, so the socket is unreachable on WSL2. Always use `InetSocketAddress("0.0.0.0", port)`.
+- **Prometheus `host.docker.internal` on Docker Desktop + WSL2** — Docker Desktop resolves `host.docker.internal` to the VM gateway (`192.168.65.254`), which can't route to WSL2 host services. Fix: `extra_hosts: ["host.docker.internal:${HOST_IP:-host-gateway}"]` in docker-compose, with `dev.sh` exporting `HOST_IP` from `eth0`. Container-to-container targets (ml-service, rabbitmq) use Docker DNS names. `network_mode: host` does NOT work on Docker Desktop (binds to VM, not WSL2 host).
 - **Old queue messages without `correlationId`** — backward compatible. Field defaults to `null`, consumer's Json uses `ignoreUnknownKeys = true`.
 - **LogstashEncoder brings jackson-databind transitively** — no conflict with kotlinx.serialization (independent serialization systems).
 
 ### Database / Infrastructure
 
+- **`lsof` can't see Docker-forwarded ports on Linux** — Docker uses iptables-level forwarding, not userspace sockets. Don't use `lsof -ti :PORT` to detect Docker-managed services. Use `docker compose ps` or health-check endpoints instead.
+- **Grafana datasource UID must match dashboard JSON** — `docker/grafana/provisioning/datasources/prometheus.yml` pins `uid: PBFA97CFB590B2093` to match the hardcoded refs in `document-pipeline.json`. Without this, volume recreation generates a new UID and all panels break.
+- **Prometheus scrape targets use two address modes** — `host.docker.internal:PORT` for host-running services (API, Worker), Docker DNS names for container services (`ml-service:8000`, `rabbitmq:15692`). Both work because Prometheus is on the bridge network with `extra_hosts` override.
 - **Rebuild Docker images after dependency changes** — `docker compose up -d` does NOT rebuild images. After adding packages to `pyproject.toml` or other dependency files, run `docker compose -f docker/docker-compose.yml build <service>` (or `up -d --build`). Stale images will silently lack new packages.
 - **Never document credential defaults in README or public docs** — they exist in `application.conf` and `docker-compose.yml` for local dev, but don't repeat values like passwords in documentation.
 - **Never edit existing Flyway migrations** — create `V{N+1}__` instead. Applied migrations are immutable.
@@ -287,6 +291,12 @@ Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATA
 - **`--tag v0.x.0`** labels unreleased commits as a version in the output without creating a git tag. Once a real tag exists, plain `git-cliff --output CHANGELOG.md` picks it up automatically.
 - **Claude session URLs and Co-Authored-By trailers are scrubbed** — `cliff.toml` has preprocessors + a postprocessor safety net. Do not remove these.
 - **Preprocessor ordering matters** — scrubs first, then first-line truncation, then link replacements. Parenthesized `(#N)` before bare `#N` to avoid double-matching.
+
+### dev.sh
+
+- **ML service is Docker-only** — its lifecycle belongs to `docker compose`, not host port checks. Never add ML back to `handle_port` pre-flight.
+- **`wait` with zero children returns immediately** — if all services are skipped, `wait` exits and `kill 0` fires, killing pre-existing processes. The `BG_JOBS` counter + `trap - EXIT` disarm prevents this.
+- **`(( x++ ))` is unsafe with `set -e`** — post-increment returns the old value; when that's 0, `(( 0 ))` returns exit code 1 and kills the script. Use `VAR=$((VAR + 1))` instead.
 
 ### Git Hooks
 

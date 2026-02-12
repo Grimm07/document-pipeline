@@ -22,7 +22,7 @@ class MetricsServer(
      * Starts the metrics HTTP server.
      */
     fun start() {
-        val httpServer = HttpServer.create(InetSocketAddress(port), 0)
+        val httpServer = HttpServer.create(InetSocketAddress("0.0.0.0", port), 0)
         httpServer.createContext("/metrics") { exchange ->
             val response = registry.scrape().toByteArray()
             exchange.responseHeaders.add("Content-Type", "text/plain; charset=utf-8")

@@ -211,7 +211,6 @@ handle_port() {
 SKIP_API=false
 SKIP_WORKER=false
 SKIP_UI=false
-SKIP_ML=false
 
 # Backend: Gradle spawns a JVM whose args include the Ktor main class
 # "org.example.pipeline.api.ApplicationKt" — we match on "pipeline.api".
@@ -233,11 +232,8 @@ fi
 # Frontend: Vite's Node process always has "vite" in its command line.
 handle_port 5173 "ui" "vite"
 
-# ML service: uvicorn running the FastAPI classification service.
-handle_port 8000 "ml" "uvicorn"
-
 # If all services are already running and we're not restarting, nothing to do.
-if $SKIP_API && $SKIP_WORKER && $SKIP_UI && $SKIP_ML; then
+if $SKIP_API && $SKIP_WORKER && $SKIP_UI; then
   echo "All services already running."
   exit 0
 fi
@@ -247,6 +243,16 @@ fi
 # ---------------------------------------------------------------------------
 # docker compose up -d is idempotent — already-running containers are untouched.
 # --wait blocks until all healthchecks pass (Postgres pg_isready, RabbitMQ ping).
+
+# Export WSL2 host IP for Prometheus to scrape host-running services (API, Worker).
+# Docker Desktop's host.docker.internal resolves to the VM gateway, not WSL2.
+# extra_hosts in docker-compose.yml overrides it with this real IP.
+export HOST_IP
+HOST_IP=$(ip -4 addr show eth0 2>/dev/null | grep -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+' || true)
+if [[ -n "$HOST_IP" ]]; then
+  echo "[infra] WSL2 host IP: $HOST_IP (used for Prometheus scraping)"
+fi
+
 echo "[infra] Starting Docker services..."
 docker compose $COMPOSE_FILES up -d --wait
 echo "[infra] Ready."
@@ -258,20 +264,18 @@ echo "[infra] Ready."
 # /health endpoint for up to 180s. If it doesn't come up in time, continue
 # anyway — the API and worker will gracefully fail classification until ML
 # is ready.
-if ! $SKIP_ML; then
-  echo "[ml]   Waiting for ML service on port 8000 (model loading may take a few minutes)..."
-  ML_ELAPSED=0
-  while ! curl -sf http://localhost:8000/health 2>/dev/null | grep -q '"models_loaded":true'; do
-    if (( ML_ELAPSED >= ML_TIMEOUT )); then
-      echo "[ml]   ML service not ready after ${ML_TIMEOUT}s — continuing without it."
-      break
-    fi
-    sleep 5
-    (( ML_ELAPSED += 5 ))
-  done
-  if (( ML_ELAPSED < ML_TIMEOUT )); then
-    echo "[ml]   Ready."
+echo "[ml]   Waiting for ML service on port 8000 (model loading may take a few minutes)..."
+ML_ELAPSED=0
+while ! curl -sf http://localhost:8000/health 2>/dev/null | grep -q '"models_loaded":true'; do
+  if (( ML_ELAPSED >= ML_TIMEOUT )); then
+    echo "[ml]   ML service not ready after ${ML_TIMEOUT}s — continuing without it."
+    break
   fi
+  sleep 5
+  (( ML_ELAPSED += 5 ))
+done
+if (( ML_ELAPSED < ML_TIMEOUT )); then
+  echo "[ml]   Ready."
 fi
 
 # ---------------------------------------------------------------------------
@@ -281,6 +285,7 @@ fi
 # which includes the backgrounded Gradle and Vite pipelines. This ensures
 # Ctrl+C cleans up everything we started in this session.
 trap 'echo; echo "Shutting down..."; kill 0' EXIT
+BG_JOBS=0
 
 # ---------------------------------------------------------------------------
 # Start backend API (port 8080)
@@ -312,6 +317,7 @@ if ! $SKIP_API; then
     (( ELAPSED += 2 ))
   done
   echo "[api]  Ready."
+  BG_JOBS=$((BG_JOBS + 1))
 fi
 
 # ---------------------------------------------------------------------------
@@ -320,6 +326,7 @@ fi
 if ! $SKIP_WORKER; then
   ./gradlew :app-worker:run -Dlogback.configurationFile=logback-text.xml 2>&1 | sed 's/^/[worker] /' &
   echo "[worker] Starting background worker..."
+  BG_JOBS=$((BG_JOBS + 1))
 fi
 
 # ---------------------------------------------------------------------------
@@ -329,9 +336,15 @@ fi
 # Vite proxies /api/* requests to localhost:8080, so the backend must be up.
 if ! $SKIP_UI; then
   (cd frontend && npm run dev) 2>&1 | sed 's/^/[ui]  /' &
+  BG_JOBS=$((BG_JOBS + 1))
 fi
 
 # ---------------------------------------------------------------------------
 # Wait for all background processes to exit (i.e., block until Ctrl+C)
 # ---------------------------------------------------------------------------
+if (( BG_JOBS == 0 )); then
+  echo "All services already running — nothing to launch."
+  trap - EXIT  # Don't kill pre-existing processes with kill 0
+  exit 0
+fi
 wait
