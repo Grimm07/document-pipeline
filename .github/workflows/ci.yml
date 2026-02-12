@@ -61,6 +61,7 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - run: npx @tanstack/router-cli generate
       - run: npm run lint
       - run: npm run format:check
 
@@ -78,6 +79,7 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - run: npx @tanstack/router-cli generate
       - run: npm test
 
   frontend-build:
@@ -94,6 +96,7 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - run: npx @tanstack/router-cli generate
       - run: npm run build
 
   ml-lint-test:
@@ -110,7 +113,7 @@ jobs:
       - name: Install dependencies
         # SYNC: If you add deps to ml-service/pyproject.toml, update this list too.
         # Full pip install -e ".[dev]" fails because paddlepaddle 2.x is gone from PyPI.
-        run: pip install pytest pytest-asyncio httpx ruff fastapi uvicorn pydantic-settings python-json-logger prometheus-client prometheus-fastapi-instrumentator Pillow PyMuPDF
+        run: pip install pytest pytest-asyncio httpx ruff fastapi uvicorn pydantic-settings python-json-logger prometheus-client prometheus-fastapi-instrumentator Pillow PyMuPDF numpy
       - name: Lint
         run: ruff check app/ && ruff format --check app/
       - name: Test
