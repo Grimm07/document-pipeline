@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 
 
+## [0.2.1] - 2026-02-12
+
+### Bug Fixes
+
+- Bind worker metrics server to 0.0.0.0 for IPv4 reachability ([7c69ff9](https://github.com/Grimm07/document-pipeline/commit/7c69ff98dfdeb8b602047076e5a47f587fa51fd1))
+
+### Documentation
+
+- Regenerate changelog for v0.2.0 release ([6e10a76](https://github.com/Grimm07/document-pipeline/commit/6e10a76885eb0427da2c1f188c3bfdae038f4d9a))
+- Add Docker rebuild and changelog ordering gotchas to CLAUDE.md ([7cf4844](https://github.com/Grimm07/document-pipeline/commit/7cf484421b8d9302d30c36f30175168173e1d551))
+
 ## [0.2.0] - 2026-02-11
 
 ### Features
