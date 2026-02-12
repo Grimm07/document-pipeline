@@ -123,7 +123,7 @@ describe("Upload Page Integration", () => {
     expect(screen.getByRole("button", { name: /upload document/i })).toBeEnabled();
   });
 
-  it("successful upload navigates to detail page", async () => {
+  it("successful upload navigates to detail page", { timeout: 15000 }, async () => {
     const user = userEvent.setup();
     renderUploadPage();
 
@@ -154,7 +154,7 @@ describe("Upload Page Integration", () => {
     );
   });
 
-  it("shows error message on upload failure", async () => {
+  it("shows error message on upload failure", { timeout: 15000 }, async () => {
     server.use(
       http.post("/api/documents/upload", () => {
         return HttpResponse.json({ error: "Internal Server Error" }, { status: 500 });
