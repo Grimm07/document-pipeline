@@ -6,9 +6,9 @@ Document Pipeline can run end-to-end without an NVIDIA GPU.
 """
 
 import random
-import string
 
 from fastapi import FastAPI
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
 # ---------------------------------------------------------------------------
@@ -24,6 +24,7 @@ class ClassifyRequest(BaseModel):
 class ClassifyResponse(BaseModel):
     classification: str
     confidence: float
+    scores: dict[str, float] | None = None
 
 
 class BoundingBox(BaseModel):
@@ -55,6 +56,7 @@ class OcrResult(BaseModel):
 class ClassifyWithOcrResponse(BaseModel):
     classification: str
     confidence: float
+    scores: dict[str, float] | None = None
     ocr: OcrResult | None = None
 
 
@@ -81,9 +83,25 @@ CANDIDATE_LABELS = [
 ]
 
 SAMPLE_WORDS = [
-    "Lorem", "ipsum", "dolor", "sit", "amet", "consectetur",
-    "adipiscing", "elit", "sed", "do", "eiusmod", "tempor",
-    "incididunt", "ut", "labore", "et", "dolore", "magna", "aliqua",
+    "Lorem",
+    "ipsum",
+    "dolor",
+    "sit",
+    "amet",
+    "consectetur",
+    "adipiscing",
+    "elit",
+    "sed",
+    "do",
+    "eiusmod",
+    "tempor",
+    "incididunt",
+    "ut",
+    "labore",
+    "et",
+    "dolore",
+    "magna",
+    "aliqua",
 ]
 
 # MIME types that should receive OCR results
@@ -102,11 +120,29 @@ OCR_MIME_TYPES = {
 # ---------------------------------------------------------------------------
 
 
-def _random_classification() -> tuple[str, float]:
-    """Return a random label and confidence score."""
+def _random_classification() -> tuple[str, float, dict[str, float]]:
+    """Return a random label, confidence score, and full score distribution."""
     label = random.choice(CANDIDATE_LABELS)
     confidence = round(random.uniform(0.60, 0.99), 2)
-    return label, confidence
+
+    # Build a realistic score distribution: winner gets the highest score,
+    # remaining probability is distributed across the other labels.
+    remaining = 1.0 - confidence
+    others = [lbl for lbl in CANDIDATE_LABELS if lbl != label]
+    random.shuffle(others)
+
+    # Generate random weights, then normalize to fill the remaining probability
+    weights = [random.random() for _ in others]
+    weight_sum = sum(weights)
+    scores: dict[str, float] = {label: confidence}
+    for i, other_label in enumerate(others):
+        if i == len(others) - 1:
+            # Last label gets exact remainder so scores sum to exactly 1.0
+            scores[other_label] = round(1.0 - sum(scores.values()), 4)
+        else:
+            scores[other_label] = round((weights[i] / weight_sum) * remaining, 4)
+
+    return label, confidence, scores
 
 
 def _random_text(min_words: int = 3, max_words: int = 12) -> str:
@@ -172,15 +208,26 @@ async def health():
     )
 
 
+@app.get("/metrics")
+async def metrics():
+    """Minimal Prometheus-compatible metrics endpoint (prevents 404 scrape errors)."""
+    return PlainTextResponse(
+        "# HELP mock_ml_service_up Mock ML service is running.\n"
+        "# TYPE mock_ml_service_up gauge\n"
+        "mock_ml_service_up 1\n",
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
+
+
 @app.post("/classify", response_model=ClassifyResponse)
 async def classify(request: ClassifyRequest):
-    label, confidence = _random_classification()
-    return ClassifyResponse(classification=label, confidence=confidence)
+    label, confidence, scores = _random_classification()
+    return ClassifyResponse(classification=label, confidence=confidence, scores=scores)
 
 
 @app.post("/classify-with-ocr", response_model=ClassifyWithOcrResponse)
 async def classify_with_ocr(request: ClassifyRequest):
-    label, confidence = _random_classification()
+    label, confidence, scores = _random_classification()
 
     # Only generate OCR for image/PDF types
     ocr = None
@@ -190,5 +237,6 @@ async def classify_with_ocr(request: ClassifyRequest):
     return ClassifyWithOcrResponse(
         classification=label,
         confidence=confidence,
+        scores=scores,
         ocr=ocr,
     )

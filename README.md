@@ -4,6 +4,8 @@ A multi-module Kotlin document ingestion service. Accepts document uploads (PDF,
 
 Includes a React SPA frontend with rich document viewers, a Python FastAPI ML service with GPU-accelerated classification and OCR, and a single-command dev environment.
 
+![Document Pipeline Demo](docs/doc_upload.gif)
+
 ## Architecture
 
 ```
@@ -34,9 +36,9 @@ ml-service/ ────── (Python FastAPI, pip-managed) ◀── app-worke
 ### Prerequisites
 
 - JDK 21+
-- Docker & Docker Compose
+- Docker & Docker Compose v2.24.0+
 - Node.js 18+ and npm (for frontend)
-- NVIDIA GPU with CUDA 12.x (for ML service; optional — pipeline works without it)
+- NVIDIA GPU with CUDA 12.x (for real ML service; **optional** — a mock ML service is included)
 
 ### One Command
 
@@ -44,16 +46,64 @@ ml-service/ ────── (Python FastAPI, pip-managed) ◀── app-worke
 ./scripts/dev.sh
 ```
 
-Starts everything: Docker infrastructure (PostgreSQL, RabbitMQ, ML service), the Ktor API, the background worker, and the Vite frontend dev server. Output is prefixed with `[infra]`, `[api]`, `[worker]`, `[ui]`, and `[ml]` labels. Press Ctrl+C to stop.
+This starts **everything**: Docker infrastructure (PostgreSQL, RabbitMQ, ML service, Prometheus, Grafana), the Ktor API server, the background worker, and the Vite frontend dev server. Output from each process is prefixed with `[infra]`, `[api]`, `[worker]`, `[ui]`, and `[ml]` labels. Press **Ctrl+C** to stop all processes.
+
+Open [http://localhost:5173](http://localhost:5173) in your browser to use the frontend.
+
+### Try It Out
+
+An example invoice is included at [`data/invoice.jpg`](data/invoice.jpg). Upload it through the frontend or via the API:
 
 ```bash
-./scripts/dev.sh --stop       # Stop all processes + Docker containers (preserves images/volumes)
-./scripts/dev.sh --destroy    # Stop all + remove Docker containers and volumes
-./scripts/dev.sh --restart    # Kill our processes and restart fresh
-./scripts/dev.sh --force      # Kill ANY process on our ports, then start fresh
+curl -X POST http://localhost:8080/api/documents/upload \
+  -F "file=@data/invoice.jpg" \
+  -F "uploadedBy=demo"
 ```
 
+The pipeline will classify it, run OCR, and you can view the results in the frontend — including the classification label, confidence scores, OCR text, and bounding box overlays.
+
+### `dev.sh` Reference
+
+The dev script handles the full lifecycle of the local environment. It auto-detects GPU availability and switches between the real ML service (GPU, ~4 GB model download on first run) and a lightweight mock ML service (instant startup, randomized but schema-valid responses).
+
+| Flag | What it does |
+|------|--------------|
+| *(no flags)* | Start everything. Skips services already running. |
+| `--mock-ml` | Force the mock ML service even when a GPU is available. Useful for quick demos or frontend development without waiting for model loading. |
+| `--restart` | Kill processes started by this script and restart them fresh. |
+| `--force` | Kill **any** process on the required ports (even if not part of this project), then start fresh. |
+| `--stop` | Stop all processes and Docker containers. Preserves images and volumes. |
+| `--destroy` | Stop everything and **remove** Docker containers and volumes (clean slate). |
+
+Flags can be combined: `./scripts/dev.sh --mock-ml --restart`
+
+**Port assignments**:
+
+| Port | Service |
+|------|---------|
+| 5173 | Frontend (Vite dev server) |
+| 8080 | API server (Ktor) |
+| 8081 | Worker metrics (Prometheus) |
+| 8000 | ML service (real or mock) |
+| 5432 | PostgreSQL |
+| 5672 | RabbitMQ (AMQP) |
+| 15672 | RabbitMQ management UI |
+| 9090 | Prometheus |
+| 3000 | Grafana |
+
+**What happens on startup**:
+
+1. Parses flags and detects GPU availability (or uses `--mock-ml` override)
+2. Checks ports for conflicts — reuses already-running services unless `--restart` or `--force`
+3. Starts Docker containers (PostgreSQL, RabbitMQ, ML service, Prometheus, Grafana) and waits for health checks
+4. Waits for the ML service to load models (up to 180s for GPU, 30s for mock)
+5. Starts the API server (Gradle compiles first — 30-60s on a cold daemon)
+6. Starts the background worker
+7. Starts the Vite frontend dev server
+
 ### Manual Start
+
+If you prefer to start services individually:
 
 ```bash
 # 1. Start infrastructure
@@ -70,6 +120,12 @@ docker compose -f docker/docker-compose.yml up -d
 cd frontend && npm install && npm run dev
 ```
 
+To use the mock ML service without `dev.sh`:
+
+```bash
+docker compose -f docker/docker-compose.yml -f docker/docker-compose.mock.yml up -d
+```
+
 ### Verify
 
 ```bash
@@ -79,7 +135,7 @@ curl localhost:8080/metrics                 # API Prometheus metrics
 curl localhost:8081/metrics                 # Worker Prometheus metrics
 curl localhost:8000/health                  # ML service
 curl localhost:8000/metrics                 # ML service Prometheus metrics
-curl localhost:15672                        # RabbitMQ management UI
+curl localhost:15672                        # RabbitMQ management UI (guest/guest)
 curl localhost:9090/api/v1/targets          # Prometheus scrape targets
 curl localhost:3000/api/health              # Grafana dashboard
 ```
@@ -250,7 +306,7 @@ ML service uses `ML_`-prefixed env vars: `ML_DEVICE`, `ML_TORCH_DTYPE`, `ML_HF_H
 | 5 | Build & DevEx (Gradle config cache, Docker health checks) | Done |
 | 6 | Observability & logging (Prometheus metrics, correlation IDs, structured logging) | Done |
 | 7 | Model explainability & label correction (per-label scores, inline correction UI) | Done |
-| 8 | CI/CD (GitHub Actions, Docker image builds, GHCR) | Planned |
+| 8 | CI/CD (GitHub Actions, Docker image builds, GHCR) | Done |
 | 9 | Log ingestion & analytics — new Go service with dashboard | Planned |
 | 10 | WebSocket push updates | Planned |
 | 11 | Frontend observability | Planned |
