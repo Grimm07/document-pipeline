@@ -12,7 +12,7 @@
 
 Document Pipeline — a multi-module Kotlin document ingestion service. Accepts document uploads (PDF, images, text) via REST API, stores files locally, persists metadata in PostgreSQL, and dispatches async classification jobs through RabbitMQ to a worker that calls an external ML service.
 
-**Current state**: All business logic implemented, security-hardened (Pass 1), document viewers + OCR pipeline complete (Pass 2), test coverage expanded (Pass 3), linting + documentation enforced (Pass 4), Gradle config cache + DevEx (Pass 5), observability + structured logging (Pass 6), model explainability + label correction (Pass 7). Frontend SPA in `frontend/` with rich viewers (JSON/XML/PDF deep zoom), OCR results display (tabbed viewer with bounding box overlays), and inline label correction (popover with all candidate scores + confirmation dialog). ML service returns full label scores from zero-shot classification. DB tracks `label_scores JSONB`, `classification_source` ("ml"/"manual"), and `corrected_at` for future fine-tuning. All three services expose Prometheus `/metrics` endpoints; correlation IDs propagate API → RabbitMQ → Worker → ML via `X-Request-ID`. All tests pass (`./gradlew test` and `cd frontend && npm test`). All linters pass (`./gradlew detekt`, `ruff check`, `eslint`). Run `grep -rn "TODO()" --include="*.kt" .` to verify no stubs remain.
+**Current state**: All business logic implemented, security-hardened (Pass 1), document viewers + OCR pipeline complete (Pass 2), test coverage expanded (Pass 3), linting + documentation enforced (Pass 4), Gradle config cache + DevEx (Pass 5), observability + structured logging (Pass 6), model explainability + label correction (Pass 7), CI/CD pipeline (Phase 8). Frontend SPA in `frontend/` with rich viewers (JSON/XML/PDF deep zoom), OCR results display (tabbed viewer with bounding box overlays), and inline label correction (popover with all candidate scores + confirmation dialog). ML service returns full label scores from zero-shot classification. DB tracks `label_scores JSONB`, `classification_source` ("ml"/"manual"), and `corrected_at` for future fine-tuning. All three services expose Prometheus `/metrics` endpoints; correlation IDs propagate API → RabbitMQ → Worker → ML via `X-Request-ID`. GitHub Actions CI runs 8 parallel jobs on PRs; release workflow auto-versions, builds container images to GHCR, runs Trivy scans, and creates GitHub Releases. All tests pass (`./gradlew test` and `cd frontend && npm test`). All linters pass (`./gradlew detekt`, `ruff check`, `eslint`). Run `grep -rn "TODO()" --include="*.kt" .` to verify no stubs remain.
 
 ## Build & Run Commands
 
@@ -117,6 +117,31 @@ cd frontend && npm run format:check
 # Auto-fix TypeScript formatting
 cd frontend && npm run format
 
+# --- Container Images ---
+
+# Build API image as local Docker tar (no push, no Docker daemon needed)
+./gradlew :app-api:jibBuildTar --no-configuration-cache
+
+# Build Worker image as local Docker tar
+./gradlew :app-worker:jibBuildTar --no-configuration-cache
+
+# Build API image to local Docker daemon
+./gradlew :app-api:jibDockerBuild --no-configuration-cache
+
+# Push API image to GHCR (requires docker login)
+./gradlew :app-api:jib --no-configuration-cache
+
+# Override image tags at build time
+./gradlew :app-api:jib --no-configuration-cache -Djib.to.tags=latest,v0.3.0,abc1234
+
+# Build frontend Docker image
+cd frontend && docker build -t document-pipeline-frontend .
+
+# --- Versioning ---
+
+# Preview next version (dry-run, no tags created)
+cog bump --auto --dry-run
+
 # --- Changelog ---
 
 # Regenerate changelog (picks up git tags automatically)
@@ -179,6 +204,8 @@ ml-service/ ────── (Python FastAPI, pip-managed) ◀── app-worke
 - **Correlation ID propagation**: API generates UUID via Ktor `CallId` plugin → stored in `DocumentMessage.correlationId` field → Worker extracts and sets `MDC("correlationId")` → forwarded as `X-Request-ID` header to ML service → ML stores in `ContextVar` via ASGI middleware. All JSON logs include `correlationId`.
 - **Prometheus metrics**: API at `/metrics` (Micrometer+Ktor), Worker at port 8081 `/metrics` (JDK HttpServer), ML at `/metrics` (prometheus-fastapi-instrumentator). Grafana dashboards auto-provisioned.
 - **Structured JSON logging**: LogstashEncoder (Kotlin) and python-json-logger (Python). Dev mode uses plain text (`-Dlogback.configurationFile=logback-text.xml` in `dev.sh`).
+- **Container images**: Jib (Gradle plugin) for backend images (`app-api`, `app-worker`) — no Dockerfiles, layered JRE images from `eclipse-temurin:21-jre-alpine`. Multi-stage Dockerfile for frontend (Node build → nginx). All pushed to `ghcr.io/grimm07/document-pipeline-*`. ML service uses existing Dockerfile in `docker/`.
+- **CI/CD**: GitHub Actions — `ci.yml` (8 parallel PR check jobs), `release.yml` (auto-version → image build → Trivy scan → GitHub Release), `codeql.yml` (SAST for Kotlin, JS/TS, Python). Dependabot watches 4 ecosystems (Gradle, npm, pip, GitHub Actions).
 
 ### Two Runnable Applications
 
@@ -209,6 +236,7 @@ Note the DI asymmetry: API module is a top-level `val`; worker module is a funct
 **ML Service**: Python 3.12, FastAPI, Transformers (DeBERTa-v3-large NLI), GOT-OCR2, PaddleOCR, PyMuPDF, prometheus-client + prometheus-fastapi-instrumentator, python-json-logger, Ruff
 **Testing**: Kotest 6 (FunSpec) + JUnit 5 + Testcontainers + MockK (backend), Vitest + RTL + MSW + Playwright (frontend), pytest (ML)
 **Infrastructure**: PostgreSQL 16, RabbitMQ 4, Docker Compose, Prometheus + Grafana, NVIDIA CUDA 12.6 (optional), git-cliff (changelog), Lefthook, Cocogitto (commit linting)
+**CI/CD**: GitHub Actions, Jib 3.4 (JVM container images), Trivy (container scanning), CodeQL (SAST), Dependabot (dependency updates), GHCR (container registry)
 
 **Test file convention**: `<module>/src/test/kotlin/org/example/pipeline/<package>/<ClassName>Test.kt`. Stress tests use `<ClassName>StressTest.kt` suffix in the same directory.
 **ML service test convention**: `ml-service/tests/test_<module>.py`. GPU integration tests in `test_gpu_integration.py` are marked `@pytest.mark.gpu` and excluded by default (`addopts = "-m 'not gpu'"` in pyproject.toml). Run with `pytest -m gpu -v`. Module-scoped fixtures for loaded models avoid reloading between tests.
@@ -316,6 +344,19 @@ Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATA
 - **OCR bounding boxes** are text region polygons (lines/paragraphs), not per-word boxes.
 - **FastAPI TestClient triggers lifespan** — swap `app.router.lifespan_context` with no-op for tests.
 - **Ruff enforces Google-style docstrings** — all public functions/classes need docstrings. Test files and `__init__.py` are excluded. Run `ruff check app/` and `ruff format --check app/` before committing.
+
+### CI/CD
+
+- **Jib requires `--no-configuration-cache`** — Jib 3.4.4 serializes `Project` at execution time, incompatible with Gradle's configuration cache. Always pass `--no-configuration-cache` for `jib`/`jibBuildTar`/`jibDockerBuild` tasks. Normal `build`/`test` tasks are unaffected.
+- **Jib tag override** — use `-Djib.to.tags=latest,v1.0.0,sha` to override the tags defined in `build.gradle.kts`. Jib reads `GIT_SHA` env var for the default dev tag.
+- **`cog bump --auto --dry-run`** — calculates the next semver from conventional commits since last tag. Returns non-zero if no bump needed (e.g., only `docs:` or `chore:` commits). Release workflow gates on this.
+- **ML service CI pip install** — do NOT use `pip install -e ".[dev]"` in CI. PaddlePaddle 2.x is no longer on PyPI. Install individual packages instead (pytest, ruff, fastapi, etc.).
+- **Playwright E2E excluded from CI** — needs full backend stack (PostgreSQL, RabbitMQ, ML service). Run locally or in a future dedicated E2E workflow.
+- **Release workflow pushes to main** — the `create-release` job commits the changelog and pushes. Needs `github-actions[bot]` allowed to bypass branch protection. Loop prevention: `paths-ignore: ['CHANGELOG.md']` + `[skip ci]` in the commit message (defense-in-depth).
+- **`fetch-depth: 0` required** — both Cocogitto (`cog bump`) and git-cliff need full git history to calculate versions and generate changelogs. Shallow clones break them.
+- **CodeQL language identifier** — Kotlin uses `java-kotlin` (not `kotlin`). It needs `autobuild` mode with Java 21 + Gradle set up.
+- **Trivy SARIF upload** — results go to GitHub Security tab → Code scanning alerts. Uses `if: always()` so results upload even if Trivy finds HIGH/CRITICAL vulnerabilities.
+- **Dependabot grouped updates** — Ktor, Exposed, Kotest, Testcontainers, TanStack, and testing libraries are grouped to avoid PR spam. Groups create one PR per group.
 
 ### Testing
 

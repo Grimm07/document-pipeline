@@ -79,6 +79,7 @@ commit_parsers = [
     { message = "^doc", group = "<!-- 5 -->Documentation" },
     { message = "^test", group = "<!-- 6 -->Testing" },
     { message = "^style", group = "<!-- 7 -->Styling" },
+    { message = "^docs\\(release\\)", skip = true },
     { message = "^chore\\(release\\): prepare for", skip = true },
     { message = "^chore|^ci", group = "<!-- 8 -->Chores" },
     { message = "^revert", group = "<!-- 9 -->Reverted" },

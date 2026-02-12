@@ -1,6 +1,7 @@
 plugins {
     id("pipeline-conventions")
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.jib)
     application
 }
 
@@ -47,6 +48,20 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.bundles.testcontainers)
+}
+
+jib {
+    from { image = "eclipse-temurin:21-jre-alpine" }
+    to {
+        image = "ghcr.io/grimm07/document-pipeline-api"
+        tags = setOf("latest", System.getenv("GIT_SHA") ?: "dev")
+    }
+    container {
+        jvmFlags = listOf("-XX:MaxRAMPercentage=75.0")
+        mainClass = "org.example.pipeline.api.ApplicationKt"
+        ports = listOf("8080")
+        creationTime.set("USE_CURRENT_TIMESTAMP")
+    }
 }
 
 tasks.named<JavaExec>("run") {

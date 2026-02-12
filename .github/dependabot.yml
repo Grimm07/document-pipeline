@@ -1,0 +1,39 @@
+version: 2
+updates:
+  - package-ecosystem: "gradle"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    groups:
+      ktor:
+        patterns: ["io.ktor:*"]
+      exposed:
+        patterns: ["org.jetbrains.exposed:*"]
+      kotest:
+        patterns: ["io.kotest:*"]
+      testcontainers:
+        patterns: ["org.testcontainers:*"]
+
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    groups:
+      tanstack:
+        patterns: ["@tanstack/*"]
+      testing:
+        patterns: ["vitest", "@testing-library/*", "msw"]
+
+  - package-ecosystem: "pip"
+    directory: "/ml-service"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"

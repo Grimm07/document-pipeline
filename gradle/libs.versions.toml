@@ -21,6 +21,7 @@ kotest = "6.1.2"
 mockk = "1.14.9"
 testcontainers = "1.20.4"
 detekt = "1.23.8"
+jib = "3.4.4"
 [libraries]
 # Kotlin
 kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
@@ -106,3 +107,4 @@ kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ktor = { id = "io.ktor.plugin", version.ref = "ktor" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+jib = { id = "com.google.cloud.tools.jib", version.ref = "jib" }

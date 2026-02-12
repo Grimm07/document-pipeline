@@ -1,0 +1,163 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "CHANGELOG.md"
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  version:
+    name: Calculate Version
+    runs-on: ubuntu-latest
+    outputs:
+      bumped: ${{ steps.bump.outputs.bumped }}
+      version: ${{ steps.bump.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install Cocogitto
+        run: |
+          curl -sSL https://github.com/cocogitto/cocogitto/releases/download/6.5.0/cocogitto-6.5.0-x86_64-unknown-linux-musl.tar.gz -o cog.tar.gz
+          tar xzf cog.tar.gz
+          sudo mv x86_64-unknown-linux-musl/cog /usr/local/bin/
+      - name: Calculate next version
+        id: bump
+        run: |
+          if NEXT=$(cog bump --auto --dry-run 2>&1); then
+            VERSION=$(echo "$NEXT" | grep -oP 'v[\d.]+' | tail -1)
+            if [ -z "$VERSION" ]; then
+              echo "::error::Failed to parse version from cog output: $NEXT"
+              exit 1
+            fi
+            echo "bumped=true" >> "$GITHUB_OUTPUT"
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "Next version: $VERSION"
+          else
+            echo "bumped=false" >> "$GITHUB_OUTPUT"
+            echo "No version bump needed"
+          fi
+
+  build-images:
+    name: Build & Push Images
+    runs-on: ubuntu-latest
+    needs: version
+    if: needs.version.outputs.bumped == 'true'
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push API image (Jib)
+        env:
+          GIT_SHA: ${{ github.sha }}
+        run: ./gradlew :app-api:jib --no-configuration-cache -Djib.to.tags=latest,"$GIT_SHA","$VERSION"
+
+      - name: Build & push Worker image (Jib)
+        env:
+          GIT_SHA: ${{ github.sha }}
+        run: ./gradlew :app-worker:jib --no-configuration-cache -Djib.to.tags=latest,"$GIT_SHA","$VERSION"
+
+      - name: Build & push Frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          push: true
+          tags: |
+            ghcr.io/grimm07/document-pipeline-frontend:latest
+            ghcr.io/grimm07/document-pipeline-frontend:${{ github.sha }}
+            ghcr.io/grimm07/document-pipeline-frontend:${{ needs.version.outputs.version }}
+
+  trivy-scan:
+    name: Trivy Scan (${{ matrix.image }})
+    runs-on: ubuntu-latest
+    needs: [version, build-images]
+    if: needs.version.outputs.bumped == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - document-pipeline-api
+          - document-pipeline-worker
+          - document-pipeline-frontend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Trivy
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ghcr.io/grimm07/${{ matrix.image }}:${{ github.sha }}
+          format: sarif
+          output: trivy-${{ matrix.image }}.sarif
+          severity: CRITICAL,HIGH
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-${{ matrix.image }}.sarif
+          category: trivy-${{ matrix.image }}
+
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [version, trivy-scan]
+    if: needs.version.outputs.bumped == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install git-cliff
+        run: |
+          curl -sSL https://github.com/orhun/git-cliff/releases/download/v2.7.0/git-cliff-2.7.0-x86_64-unknown-linux-gnu.tar.gz -o git-cliff.tar.gz
+          tar xzf git-cliff.tar.gz
+          sudo mv git-cliff-2.7.0/git-cliff /usr/local/bin/
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Create tag and changelog
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          git tag "$VERSION"
+          git-cliff --output CHANGELOG.md
+          git-cliff --latest --strip header --output RELEASE_NOTES.md
+          git add CHANGELOG.md
+          git commit -m "docs(release): update changelog for $VERSION [skip ci]"
+          git tag -f "$VERSION"
+          git push origin main --tags
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.version.outputs.version }}
+          body_path: RELEASE_NOTES.md
+          generate_release_notes: false
