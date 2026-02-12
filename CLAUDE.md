@@ -250,7 +250,7 @@ Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATA
 ## Git Workflow
 
 - **Remote**: `git@github.com:Grimm07/document-pipeline.git` (origin)
-- **Branch**: `main` — all work currently on main (no feature branch convention yet)
+- **Branching**: Create small, focused branches per logical change. One bug fix = one branch. One feature = one branch. Keep PRs small and reviewable — avoid bundling unrelated changes. Branch naming: `fix/short-description`, `feat/short-description`, `chore/short-description`.
 - **Commit style**: conventional commits required (`feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `perf:`, `chore:`, `ci:`, `style:`) — these feed the auto-generated changelog
 - **Commit linting**: Enforced by Lefthook + Cocogitto `commit-msg` hook. Run `lefthook install` after cloning.
 - **Changelog**: auto-generated via [git-cliff](https://git-cliff.org) from conventional commits. Config in `cliff.toml`. Regenerate with `git-cliff --output CHANGELOG.md`
@@ -307,7 +307,7 @@ Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATA
 - **`Promise.allSettled` in TanStack Query** — `onSuccess` always fires. Must inspect per-result `status` for failures.
 - **Radix AlertDialog + async** — use controlled `open`/`onOpenChange` state for dialogs triggering mutations; uncontrolled won't close if page stays mounted. `AlertDialogAction` auto-closes the dialog *before* async `onClick` completes — use a regular `Button` for confirm actions that trigger mutations. Pair with `useRef` to protect selected state from `onOpenChange` race.
 - **Hook tests with MSW + relative URLs** — `renderHook` in jsdom has no browser `location`, so `fetch("/api/...")` throws "Failed to parse URL". Use `vi.mock` on the API module instead of MSW for isolated hook tests.
-- **`apiFetch` header merge caveat** — `{ headers: { Accept, ...init?.headers }, ...init }` — the final `...init` overwrites merged headers when `init` also has `headers`. Harmless now but will break if auth headers are added to `apiFetch`. Fix: merge headers explicitly.
+- **`apiFetch` header merge** — headers are destructured from `init` before spreading (`const { headers, ...rest } = init`) to prevent `...init` from overwriting the merged headers object.
 - **JSDoc required on exports** — `eslint-plugin-jsdoc` enforces `require-jsdoc` on exported functions, classes, interfaces, and type aliases. Excluded: tests, routes, `components/ui/`, generated files. Use `/** Description. */` (no `@param`/`@returns` — TypeScript types suffice).
 - **Prettier runs separately** — `npm run format:check` verifies, `npm run format` auto-fixes. Config: 100-char width, double quotes, trailing commas.
 
