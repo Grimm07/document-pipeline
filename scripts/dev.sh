@@ -9,6 +9,7 @@
 #
 # Usage:
 #   ./scripts/dev.sh              # Normal start. Skips processes already running.
+#   ./scripts/dev.sh --mock-ml    # Force mock ML service even when GPU is available.
 #   ./scripts/dev.sh --restart    # Kill our processes and restart them fresh.
 #   ./scripts/dev.sh --force      # Kill ANY process on our ports, even if it's
 #                                 # not part of this project, then start fresh.
@@ -30,15 +31,17 @@ RESTART=false
 FORCE=false
 STOP=false
 DESTROY=false
+MOCK_ML=false
 for arg in "$@"; do
   case "$arg" in
-    --restart) RESTART=true ;;
-    --force)   FORCE=true ;;
-    --stop)    STOP=true ;;
-    --destroy) DESTROY=true ;;
+    --restart)  RESTART=true ;;
+    --force)    FORCE=true ;;
+    --stop)     STOP=true ;;
+    --destroy)  DESTROY=true ;;
+    --mock-ml)  MOCK_ML=true ;;
     *)
       echo "Unknown flag: $arg" >&2
-      echo "Usage: $0 [--restart | --force | --stop | --destroy]" >&2
+      echo "Usage: $0 [--mock-ml] [--restart | --force | --stop | --destroy]" >&2
       exit 1
       ;;
   esac
@@ -48,7 +51,11 @@ done
 # GPU detection — use mock ML service when no GPU available
 # ---------------------------------------------------------------------------
 COMPOSE_FILES="-f docker/docker-compose.yml"
-if command -v nvidia-smi &>/dev/null && nvidia-smi &>/dev/null; then
+if $MOCK_ML; then
+  echo "[ml]   --mock-ml flag set — using mock ML service."
+  COMPOSE_FILES="$COMPOSE_FILES -f docker/docker-compose.mock.yml"
+  ML_TIMEOUT=30
+elif command -v nvidia-smi &>/dev/null && nvidia-smi &>/dev/null; then
   echo "[ml]   GPU detected — using real ML service."
   ML_TIMEOUT=180
 else
@@ -254,7 +261,7 @@ if [[ -n "$HOST_IP" ]]; then
 fi
 
 echo "[infra] Starting Docker services..."
-docker compose $COMPOSE_FILES up -d --wait
+docker compose $COMPOSE_FILES up -d --build --wait
 echo "[infra] Ready."
 
 # ---------------------------------------------------------------------------

@@ -2,7 +2,6 @@
 
 import base64
 
-import pytest
 from fastapi.testclient import TestClient
 
 from main import CANDIDATE_LABELS, app
@@ -33,6 +32,18 @@ def test_health_returns_healthy():
 
 
 # ---------------------------------------------------------------------------
+# GET /metrics
+# ---------------------------------------------------------------------------
+
+
+def test_metrics_returns_prometheus_text():
+    resp = client.get("/metrics")
+    assert resp.status_code == 200
+    assert "text/plain" in resp.headers["content-type"]
+    assert "mock_ml_service_up 1" in resp.text
+
+
+# ---------------------------------------------------------------------------
 # POST /classify
 # ---------------------------------------------------------------------------
 
@@ -43,6 +54,16 @@ def test_classify_returns_valid_response():
     data = resp.json()
     assert data["classification"] in CANDIDATE_LABELS
     assert 0.0 <= data["confidence"] <= 1.0
+
+    # Scores must be present with all candidate labels
+    scores = data["scores"]
+    assert isinstance(scores, dict)
+    assert set(scores.keys()) == set(CANDIDATE_LABELS)
+    # Winner's score must match the top-level confidence
+    assert scores[data["classification"]] == data["confidence"]
+    # All scores must be non-negative and sum to ~1.0
+    assert all(v >= 0.0 for v in scores.values())
+    assert abs(sum(scores.values()) - 1.0) < 0.01
 
 
 # ---------------------------------------------------------------------------
@@ -60,6 +81,13 @@ def test_classify_with_ocr_returns_ocr_for_pdf():
     assert "pages" in data["ocr"]
     assert "fullText" in data["ocr"]
     assert len(data["ocr"]["pages"]) >= 1
+
+    # Scores must be present in classify-with-ocr too
+    scores = data["scores"]
+    assert isinstance(scores, dict)
+    assert set(scores.keys()) == set(CANDIDATE_LABELS)
+    assert scores[data["classification"]] == data["confidence"]
+    assert abs(sum(scores.values()) - 1.0) < 0.01
 
 
 def test_classify_with_ocr_returns_ocr_for_image():
