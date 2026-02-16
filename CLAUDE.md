@@ -62,7 +62,6 @@ docker compose -f docker/docker-compose.yml build ml-service
 # --- ML Service (Python, FastAPI) ---
 
 # Run ML service tests (no GPU needed — all mocked)
-# NOTE: pip install -e ".[dev]" may fail on paddlepaddle — install tools directly if needed: pip install ruff pytest
 cd ml-service && pip install -e ".[dev]" && pytest tests/ -v
 
 # Run ML service via Docker (first run downloads ~4GB of model weights)
@@ -339,8 +338,7 @@ Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATA
 
 - **Needs NVIDIA GPU** by default (`ML_DEVICE=cuda`). For CPU: `ML_DEVICE=cpu`, `ML_TORCH_DTYPE=float32`, remove `deploy.resources.reservations` from docker-compose.
 - **Lazy imports for transformers/torch** — MUST be inside `load()` methods, never at module level. Causes SIGBUS on WSL2 without GPU.
-- **PaddleOCR** — lazy load; pinned to 2.x (3.x drops `det`/`rec`/`cls` params); needs `libgl1`/`libglib2.0-0` in Docker.
-- **PaddlePaddle 2.x removed from PyPI** — `pip install -e ".[dev]"` may fail. PaddleOCR 2.x requires `paddlepaddle<3,>=2.6` but only 3.x is available. Install individual dev tools (ruff, pytest) directly if full install fails. Docker build still works (pinned wheels).
+- **PaddleOCR 3.x** — lazy load via `TextDetection(model_name="PP-OCRv5_server_det", device=...)`. Uses `"gpu"` not `"cuda"` for device. PaddlePaddle 3.x must be listed explicitly in pyproject.toml (PaddleX does not declare it as a transitive dep). Needs `libgl1`/`libglib2.0-0`/`libgomp1` in Docker.
 - **OCR bounding boxes** are text region polygons (lines/paragraphs), not per-word boxes.
 - **FastAPI TestClient triggers lifespan** — swap `app.router.lifespan_context` with no-op for tests.
 - **Ruff enforces Google-style docstrings** — all public functions/classes need docstrings. Test files and `__init__.py` are excluded. Run `ruff check app/` and `ruff format --check app/` before committing.
@@ -350,7 +348,7 @@ Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATA
 - **Jib requires `--no-configuration-cache`** — Jib 3.4.4 serializes `Project` at execution time, incompatible with Gradle's configuration cache. Always pass `--no-configuration-cache` for `jib`/`jibBuildTar`/`jibDockerBuild` tasks. Normal `build`/`test` tasks are unaffected.
 - **Jib tag override** — use `-Djib.to.tags=latest,v1.0.0,sha` to override the tags defined in `build.gradle.kts`. Jib reads `GIT_SHA` env var for the default dev tag.
 - **`cog bump --auto --dry-run`** — calculates the next semver from conventional commits since last tag. Returns non-zero if no bump needed (e.g., only `docs:` or `chore:` commits). Release workflow gates on this.
-- **ML service CI pip install** — do NOT use `pip install -e ".[dev]"` in CI. PaddlePaddle 2.x is no longer on PyPI. Install individual packages instead (pytest, ruff, fastapi, etc.).
+- **ML service CI pip install** — uses `pip install -e ".[dev]"` with pip caching (PaddlePaddle 3.x is ~800MB).
 - **Playwright E2E excluded from CI** — needs full backend stack (PostgreSQL, RabbitMQ, ML service). Run locally or in a future dedicated E2E workflow.
 - **Release workflow pushes to main** — the `create-release` job commits the changelog and pushes. Needs `github-actions[bot]` allowed to bypass branch protection. Loop prevention: `paths-ignore: ['CHANGELOG.md']` + `[skip ci]` in the commit message (defense-in-depth).
 - **`fetch-depth: 0` required** — both Cocogitto (`cog bump`) and git-cliff need full git history to calculate versions and generate changelogs. Shallow clones break them.
@@ -366,7 +364,7 @@ Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATA
 - **ML tests are fully mocked** — run without GPU/CUDA/models. GPU tests: `pytest -m gpu -v` (auto-skip when unavailable).
 - **Two-tier ML mocking** — unit tests mock internals (`service._pipeline = MagicMock()`); pipeline tests use `create_autospec()`. Don't mix.
 - **SIGBUS can't be caught** — use subprocess probe to detect if `from transformers import pipeline` works.
-- **Mocking uninstalled lazy imports** — inject mock into `sys.modules["paddleocr"]` before `load()`, not `@patch()` (fails with `ModuleNotFoundError`).
+- **Mocking uninstalled lazy imports** — inject mock into `sys.modules["paddleocr"]` before `load()`, not `@patch()` (fails with `ModuleNotFoundError`). Mock `TextDetection` (not `PaddleOCR`).
 
 ## Automations
 
