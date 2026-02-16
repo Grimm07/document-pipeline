@@ -225,5 +225,37 @@ class ValidatorsTest : FunSpec({
                     .validate(validateUploadParams)
             }
         }
+
+        test("rejects blank filename") {
+            val ex = shouldThrow<ValidationException> {
+                UploadParams(filename = "  ", mimeType = "application/pdf")
+                    .validate(validateUploadParams)
+            }
+            ex.fieldErrors shouldContainKey ".filename"
+        }
+
+        test("rejects empty filename") {
+            val ex = shouldThrow<ValidationException> {
+                UploadParams(filename = "", mimeType = "application/pdf")
+                    .validate(validateUploadParams)
+            }
+            ex.fieldErrors shouldContainKey ".filename"
+        }
+
+        test("rejects blank mimeType") {
+            val ex = shouldThrow<ValidationException> {
+                UploadParams(filename = "file.txt", mimeType = "  ")
+                    .validate(validateUploadParams)
+            }
+            ex.fieldErrors shouldContainKey ".mimeType"
+        }
+
+        test("rejects empty mimeType") {
+            val ex = shouldThrow<ValidationException> {
+                UploadParams(filename = "file.txt", mimeType = "")
+                    .validate(validateUploadParams)
+            }
+            ex.fieldErrors shouldContainKey ".mimeType"
+        }
     }
 })

@@ -80,10 +80,12 @@ val validateSearchQueryParams = Validation<SearchQueryParams> {
  */
 val validateUploadParams = Validation<UploadParams> {
     UploadParams::filename {
+        constrain("must not be blank") { it.isNotBlank() }
         maxLength(255)
         constrain("must not contain path separators") { it.matches(SAFE_FILENAME_PATTERN) }
     }
     UploadParams::mimeType {
+        constrain("must not be blank") { it.isNotBlank() }
         maxLength(127)
     }
 }
