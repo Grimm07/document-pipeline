@@ -1055,4 +1055,113 @@ class DocumentRoutesTest : FunSpec({
             }
         }
     }
+
+    context("input validation") {
+        test("GET /{id} returns 400 for non-UUID id") {
+            testApplication {
+                setupApp()
+
+                val response = client.get("/api/documents/not-a-uuid")
+                response.status shouldBe HttpStatusCode.BadRequest
+                response.bodyAsText() shouldContain "UUID"
+            }
+        }
+
+        test("GET /api/documents rejects limit=0") {
+            testApplication {
+                setupApp()
+
+                val response = client.get("/api/documents?limit=0")
+                response.status shouldBe HttpStatusCode.BadRequest
+                response.bodyAsText() shouldContain "limit"
+            }
+        }
+
+        test("GET /api/documents rejects limit=501") {
+            testApplication {
+                setupApp()
+
+                val response = client.get("/api/documents?limit=501")
+                response.status shouldBe HttpStatusCode.BadRequest
+            }
+        }
+
+        test("GET /api/documents rejects negative offset") {
+            testApplication {
+                setupApp()
+
+                val response = client.get("/api/documents?offset=-1")
+                response.status shouldBe HttpStatusCode.BadRequest
+                response.bodyAsText() shouldContain "offset"
+            }
+        }
+
+        test("GET /api/documents accepts limit=500") {
+            testApplication {
+                setupApp()
+
+                coEvery { mockRepo.list(any(), 500, 0) } returns emptyList()
+
+                val response = client.get("/api/documents?limit=500")
+                response.status shouldBe HttpStatusCode.OK
+            }
+        }
+
+        test("GET /search rejects limit=0") {
+            testApplication {
+                setupApp()
+
+                val response = client.get("/api/documents/search?metadata.key=val&limit=0")
+                response.status shouldBe HttpStatusCode.BadRequest
+            }
+        }
+
+        test("PATCH classification rejects label over 255 chars") {
+            testApplication {
+                setupApp()
+
+                val doc = testDocument()
+                coEvery { mockRepo.getById(doc.id) } returns doc
+
+                val response = client.patch("/api/documents/${doc.id}/classification") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"classification":"${"a".repeat(256)}"}""")
+                }
+                response.status shouldBe HttpStatusCode.BadRequest
+            }
+        }
+
+        test("DELETE /{id} returns 400 for non-UUID id") {
+            testApplication {
+                setupApp()
+
+                val response = client.delete("/api/documents/not-a-uuid")
+                response.status shouldBe HttpStatusCode.BadRequest
+            }
+        }
+
+        test("POST /{id}/retry returns 400 for non-UUID id") {
+            testApplication {
+                setupApp()
+
+                val response = client.post("/api/documents/not-a-uuid/retry")
+                response.status shouldBe HttpStatusCode.BadRequest
+            }
+        }
+
+        test("validation error response has fieldErrors structure") {
+            testApplication {
+                setupApp()
+
+                val response = client.get("/api/documents?limit=0&offset=-1")
+                response.status shouldBe HttpStatusCode.BadRequest
+
+                val body = json.parseToJsonElement(response.bodyAsText()).jsonObject
+                val fieldErrors = body["fieldErrors"]?.jsonObject
+                fieldErrors?.keys?.size shouldBe 2
+                fieldErrors?.containsKey(".limit") shouldBe true
+                fieldErrors?.containsKey(".offset") shouldBe true
+            }
+        }
+    }
 })
