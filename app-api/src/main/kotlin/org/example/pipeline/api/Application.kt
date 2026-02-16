@@ -21,9 +21,11 @@ import io.micrometer.core.instrument.distribution.DistributionStatisticConfig
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
 import kotlinx.serialization.json.Json
 import org.example.pipeline.api.di.apiModule
+import org.example.pipeline.api.dto.ValidationErrorResponse
 import org.example.pipeline.api.routes.documentRoutes
 import org.example.pipeline.api.routes.healthRoutes
 import org.example.pipeline.api.routes.metricsRoutes
+import org.example.pipeline.api.validation.ValidationException
 import org.koin.ktor.ext.inject
 import org.koin.ktor.plugin.Koin
 import org.koin.logger.slf4jLogger
@@ -122,6 +124,14 @@ fun Application.module() {
 
     // Install status pages for error handling
     install(StatusPages) {
+        exception<ValidationException> { call, cause ->
+            logger.warn("Validation failed: {}", cause.fieldErrors)
+            call.respond(
+                HttpStatusCode.BadRequest,
+                ValidationErrorResponse(error = "Validation failed", fieldErrors = cause.fieldErrors)
+            )
+        }
+
         exception<IllegalArgumentException> { call, cause ->
             logger.warn("Bad request: ${cause.message}")
             call.respond(

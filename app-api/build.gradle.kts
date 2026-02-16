@@ -24,6 +24,9 @@ dependencies {
     // RabbitMQ (exposed through infra-queue, needed for Connection type in DI)
     implementation(libs.rabbitmq.client)
 
+    // Validation
+    implementation(libs.konform)
+
     // Koin DI
     implementation(libs.bundles.koin)
 
