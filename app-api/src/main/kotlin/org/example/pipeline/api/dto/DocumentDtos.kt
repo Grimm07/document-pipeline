@@ -95,7 +95,7 @@ data class ErrorResponse(
  */
 @Serializable
 data class ValidationErrorResponse(
-    val error: String = "Validation failed",
+    val error: String,
     val fieldErrors: Map<String, List<String>>
 )
 

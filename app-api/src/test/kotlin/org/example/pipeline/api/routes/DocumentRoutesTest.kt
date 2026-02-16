@@ -89,7 +89,7 @@ class DocumentRoutesTest : FunSpec({
                 exception<ValidationException> { call, cause ->
                     call.respond(
                         HttpStatusCode.BadRequest,
-                        ValidationErrorResponse(fieldErrors = cause.fieldErrors)
+                        ValidationErrorResponse(error = "Validation failed", fieldErrors = cause.fieldErrors)
                     )
                 }
                 exception<IllegalArgumentException> { call, cause ->
@@ -1157,6 +1157,7 @@ class DocumentRoutesTest : FunSpec({
                 response.status shouldBe HttpStatusCode.BadRequest
 
                 val body = json.parseToJsonElement(response.bodyAsText()).jsonObject
+                body["error"]?.jsonPrimitive?.content shouldBe "Validation failed"
                 val fieldErrors = body["fieldErrors"]?.jsonObject
                 fieldErrors?.keys?.size shouldBe 2
                 fieldErrors?.containsKey(".limit") shouldBe true

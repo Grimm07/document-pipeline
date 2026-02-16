@@ -128,7 +128,7 @@ fun Application.module() {
             logger.warn("Validation failed: {}", cause.fieldErrors)
             call.respond(
                 HttpStatusCode.BadRequest,
-                ValidationErrorResponse(fieldErrors = cause.fieldErrors)
+                ValidationErrorResponse(error = "Validation failed", fieldErrors = cause.fieldErrors)
             )
         }
 
