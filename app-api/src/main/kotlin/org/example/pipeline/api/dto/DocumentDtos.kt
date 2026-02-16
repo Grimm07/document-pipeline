@@ -100,6 +100,41 @@ data class ValidationErrorResponse(
 )
 
 /**
+ * Parsed query parameters for the document list endpoint.
+ *
+ * @property limit Maximum number of results (1-500)
+ * @property offset Number of results to skip (>= 0)
+ * @property classification Optional classification filter
+ */
+data class ListQueryParams(
+    val limit: Int,
+    val offset: Int,
+    val classification: String?
+)
+
+/**
+ * Parsed query parameters for the metadata search endpoint.
+ *
+ * @property metadata Metadata key-value pairs to match (at least one required)
+ * @property limit Maximum number of results (1-500)
+ */
+data class SearchQueryParams(
+    val metadata: Map<String, String>,
+    val limit: Int
+)
+
+/**
+ * Parsed multipart upload fields for validation.
+ *
+ * @property filename Original filename from the upload
+ * @property mimeType MIME type from the upload
+ */
+data class UploadParams(
+    val filename: String,
+    val mimeType: String
+)
+
+/**
  * Converts a [Document] domain object to its API response DTO.
  *
  * @return [DocumentResponse] with all fields mapped from the domain model
