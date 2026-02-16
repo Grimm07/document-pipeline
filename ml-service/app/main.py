@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI):
     logger.info("Loading models...")
     classifier.load(settings.classifier_model, settings.device, settings.torch_dtype)
     ocr.load(settings.ocr_model, settings.device, settings.torch_dtype)
-    bbox_extractor.load()
+    bbox_extractor.load(device=settings.device)
     logger.info("All models loaded.")
 
     _pipeline = DocumentPipeline(

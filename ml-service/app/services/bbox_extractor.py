@@ -12,26 +12,29 @@ logger = logging.getLogger(__name__)
 class BBoxExtractor:
     """Extracts text region bounding boxes using PaddleOCR detection model.
 
-    Uses detection-only mode (no recognition) for fast spatial layout extraction.
-    The detection model is ~3MB and downloads on first use.
+    Uses PaddleOCR 3.x TextDetection for fast spatial layout extraction
+    without recognition. The detection model downloads on first use.
     """
 
     def __init__(self) -> None:
         """Initialize with no loaded model."""
-        self._ocr = None
+        self._detector = None
 
-    def load(self) -> None:
-        """Load the PaddleOCR detection model (lazy import for compatibility)."""
+    def load(self, device: str = "cpu") -> None:
+        """Load the PaddleOCR detection model (lazy import for compatibility).
+
+        Args:
+            device: Device string ("cuda" or "cpu"). Mapped to PaddleOCR's
+                convention ("gpu"/"cpu") internally.
+        """
         with MODEL_LOAD_DURATION.labels(model_name="paddleocr-det").time():
-            from paddleocr import PaddleOCR
+            from paddleocr import TextDetection
 
-            logger.info("Loading PaddleOCR detection model...")
-            self._ocr = PaddleOCR(
-                use_angle_cls=False,
-                lang="en",
-                det=True,
-                rec=False,
-                show_log=False,
+            paddle_device = {"cuda": "gpu", "cpu": "cpu"}.get(device, device)
+            logger.info("Loading PaddleOCR detection model on %s...", paddle_device)
+            self._detector = TextDetection(
+                model_name="PP-OCRv5_server_det",
+                device=paddle_device,
             )
             logger.info("PaddleOCR detection model loaded.")
 
@@ -51,21 +54,22 @@ class BBoxExtractor:
             import numpy as np
 
             img_array = np.array(image)
-            result = self._ocr.ocr(img_array, cls=False, rec=False)
+            output = self._detector.predict(img_array)
 
             boxes = []
-            if not result or not result[0]:
-                return boxes
-
-            for polygon in result[0]:
-                xs = [p[0] for p in polygon]
-                ys = [p[1] for p in polygon]
-                boxes.append(
-                    {
-                        "x": float(min(xs)),
-                        "y": float(min(ys)),
-                        "width": float(max(xs) - min(xs)),
-                        "height": float(max(ys) - min(ys)),
-                    }
-                )
+            for res in output:
+                dt_polys = res.get("dt_polys")
+                if dt_polys is None or len(dt_polys) == 0:
+                    continue
+                for polygon in dt_polys:
+                    xs = polygon[:, 0].astype(float)
+                    ys = polygon[:, 1].astype(float)
+                    boxes.append(
+                        {
+                            "x": float(xs.min()),
+                            "y": float(ys.min()),
+                            "width": float(xs.max() - xs.min()),
+                            "height": float(ys.max() - ys.min()),
+                        }
+                    )
             return boxes
