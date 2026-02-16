@@ -18,7 +18,7 @@ jobs:
       bumped: ${{ steps.bump.outputs.bumped }}
       version: ${{ steps.bump.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Install Cocogitto
@@ -51,7 +51,7 @@ jobs:
     env:
       VERSION: ${{ needs.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -103,7 +103,7 @@ jobs:
           - document-pipeline-worker
           - document-pipeline-frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Run Trivy
         uses: aquasecurity/trivy-action@0.28.0
         with:
@@ -127,7 +127,7 @@ jobs:
     needs: [version, trivy-scan]
     if: needs.version.outputs.bumped == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           token: ${{ secrets.RELEASE_PAT }}
