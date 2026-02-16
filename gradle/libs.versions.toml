@@ -22,6 +22,7 @@ mockk = "1.14.9"
 testcontainers = "1.21.4"
 detekt = "1.23.8"
 jib = "3.4.4"
+konform = "0.11.0"
 [libraries]
 # Kotlin
 kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
@@ -80,6 +81,9 @@ logstash-logback-encoder = { module = "net.logstash.logback:logstash-logback-enc
 
 # Metrics
 micrometer-registry-prometheus = { module = "io.micrometer:micrometer-registry-prometheus", version.ref = "micrometer" }
+
+# Validation
+konform = { module = "io.konform:konform", version.ref = "konform" }
 
 # Testing
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
