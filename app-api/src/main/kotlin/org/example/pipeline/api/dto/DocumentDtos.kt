@@ -88,6 +88,18 @@ data class ErrorResponse(
 )
 
 /**
+ * Structured validation error response with per-field error messages.
+ *
+ * @property error Summary error message (always "Validation failed")
+ * @property fieldErrors Map of field path to list of validation error messages
+ */
+@Serializable
+data class ValidationErrorResponse(
+    val error: String = "Validation failed",
+    val fieldErrors: Map<String, List<String>>
+)
+
+/**
  * Converts a [Document] domain object to its API response DTO.
  *
  * @return [DocumentResponse] with all fields mapped from the domain model
