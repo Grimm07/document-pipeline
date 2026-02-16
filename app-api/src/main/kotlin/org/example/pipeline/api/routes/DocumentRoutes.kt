@@ -10,6 +10,12 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.utils.io.toByteArray
 import org.example.pipeline.api.dto.*
+import org.example.pipeline.api.validation.validate
+import org.example.pipeline.api.validation.validateCorrectClassification
+import org.example.pipeline.api.validation.validateDocumentId
+import org.example.pipeline.api.validation.validateListQueryParams
+import org.example.pipeline.api.validation.validateSearchQueryParams
+import org.example.pipeline.api.validation.validateUploadParams
 import org.example.pipeline.domain.Document
 import org.example.pipeline.domain.DocumentRepository
 import org.example.pipeline.domain.FileStorageService
@@ -78,6 +84,7 @@ fun Application.documentRoutes() {
                 val now = Clock.System.now()
                 val actualFilename = filename ?: "unknown"
                 val actualMimeType = mimeType ?: "application/octet-stream"
+                UploadParams(actualFilename, actualMimeType).validate(validateUploadParams)
 
                 val storagePath = fileStorageService.store(id, actualFilename, bytes)
 
@@ -104,21 +111,19 @@ fun Application.documentRoutes() {
                     .filter { it.key.startsWith("metadata.") }
                     .associate { it.key.removePrefix("metadata.") to it.value.first() }
 
-                if (metadataParams.isEmpty()) {
-                    call.respond(
-                        HttpStatusCode.BadRequest,
-                        ErrorResponse("At least one metadata.* query parameter is required")
-                    )
-                    return@get
-                }
-
                 val limit = call.request.queryParameters["limit"]?.toIntOrNull()
                     ?: DEFAULT_PAGE_SIZE
-                val documents = documentRepository.searchMetadata(metadataParams, limit)
+
+                val params = SearchQueryParams(metadataParams, limit)
+                    .validate(validateSearchQueryParams)
+
+                val documents = documentRepository.searchMetadata(
+                    params.metadata, params.limit
+                )
                 val response = DocumentListResponse(
                     documents = documents.map { it.toResponse() },
                     total = documents.size,
-                    limit = limit,
+                    limit = params.limit,
                     offset = 0
                 )
                 call.respond(HttpStatusCode.OK, response)
@@ -129,6 +134,7 @@ fun Application.documentRoutes() {
                     ?: return@get call.respond(
                         HttpStatusCode.BadRequest, ErrorResponse("Missing document ID")
                     )
+                idParam.validate(validateDocumentId)
 
                 val document = documentRepository.getById(idParam)
                 if (document == null) {
@@ -165,6 +171,7 @@ fun Application.documentRoutes() {
                     ?: return@patch call.respond(
                         HttpStatusCode.BadRequest, ErrorResponse("Missing document ID")
                     )
+                idParam.validate(validateDocumentId)
 
                 val body = try {
                     call.receive<CorrectClassificationRequest>()
@@ -176,13 +183,7 @@ fun Application.documentRoutes() {
                     return@patch
                 }
 
-                if (body.classification.isBlank()) {
-                    call.respond(
-                        HttpStatusCode.BadRequest,
-                        ErrorResponse("Classification must not be blank")
-                    )
-                    return@patch
-                }
+                body.validate(validateCorrectClassification)
 
                 val existing = documentRepository.getById(idParam)
                 if (existing == null) {
@@ -212,6 +213,7 @@ fun Application.documentRoutes() {
                     ?: return@delete call.respond(
                         HttpStatusCode.BadRequest, ErrorResponse("Missing document ID")
                     )
+                idParam.validate(validateDocumentId)
 
                 val document = documentRepository.getById(idParam)
                 if (document == null) {
@@ -253,6 +255,7 @@ fun Application.documentRoutes() {
                     ?: return@post call.respond(
                         HttpStatusCode.BadRequest, ErrorResponse("Missing document ID")
                     )
+                idParam.validate(validateDocumentId)
 
                 val document = documentRepository.getById(idParam)
                 if (document == null) {
@@ -295,6 +298,7 @@ fun Application.documentRoutes() {
                     ?: return@get call.respond(
                         HttpStatusCode.BadRequest, ErrorResponse("Missing document ID")
                     )
+                idParam.validate(validateDocumentId)
 
                 val document = documentRepository.getById(idParam)
                 if (document == null) {
@@ -313,6 +317,7 @@ fun Application.documentRoutes() {
                     ?: return@get call.respond(
                         HttpStatusCode.BadRequest, ErrorResponse("Missing document ID")
                     )
+                idParam.validate(validateDocumentId)
 
                 val document = documentRepository.getById(idParam)
                 if (document == null) {
@@ -343,17 +348,22 @@ fun Application.documentRoutes() {
             }
 
             get {
-                val classification = call.request.queryParameters["classification"]
                 val limit = call.request.queryParameters["limit"]?.toIntOrNull()
                     ?: DEFAULT_PAGE_SIZE
                 val offset = call.request.queryParameters["offset"]?.toIntOrNull() ?: 0
+                val classification = call.request.queryParameters["classification"]
 
-                val documents = documentRepository.list(classification, limit, offset)
+                val params = ListQueryParams(limit, offset, classification)
+                    .validate(validateListQueryParams)
+
+                val documents = documentRepository.list(
+                    params.classification, params.limit, params.offset
+                )
                 val response = DocumentListResponse(
                     documents = documents.map { it.toResponse() },
                     total = documents.size,
-                    limit = limit,
-                    offset = offset
+                    limit = params.limit,
+                    offset = params.offset
                 )
                 call.respond(HttpStatusCode.OK, response)
             }

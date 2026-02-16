@@ -22,6 +22,8 @@ import io.mockk.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.example.pipeline.api.dto.ValidationErrorResponse
+import org.example.pipeline.api.validation.ValidationException
 import org.example.pipeline.domain.Document
 import org.example.pipeline.domain.DocumentRepository
 import org.example.pipeline.domain.FileStorageService
@@ -84,6 +86,12 @@ class DocumentRoutesTest : FunSpec({
                 })
             }
             install(StatusPages) {
+                exception<ValidationException> { call, cause ->
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        ValidationErrorResponse(fieldErrors = cause.fieldErrors)
+                    )
+                }
                 exception<IllegalArgumentException> { call, cause ->
                     call.respond(HttpStatusCode.BadRequest, mapOf("error" to (cause.message ?: "Bad request")))
                 }
