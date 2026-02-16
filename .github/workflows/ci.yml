@@ -110,10 +110,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ml-service/pyproject.toml
       - name: Install dependencies
-        # SYNC: If you add deps to ml-service/pyproject.toml, update this list too.
-        # Full pip install -e ".[dev]" fails because paddlepaddle 2.x is gone from PyPI.
-        run: pip install pytest pytest-asyncio httpx ruff fastapi uvicorn pydantic-settings python-json-logger prometheus-client prometheus-fastapi-instrumentator Pillow PyMuPDF numpy
+        run: pip install -e ".[dev]"
       - name: Lint
         run: ruff check app/ && ruff format --check app/
       - name: Test
