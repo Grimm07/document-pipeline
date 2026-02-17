@@ -34,6 +34,9 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.datetime)
 
+    // Rate limiting
+    implementation(libs.ktor.server.rate.limit)
+
     // Observability
     implementation(libs.ktor.server.metrics.micrometer)
     implementation(libs.ktor.server.call.id)

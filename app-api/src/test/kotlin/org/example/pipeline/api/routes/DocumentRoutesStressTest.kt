@@ -12,6 +12,7 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.config.*
 import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import io.ktor.server.testing.*
@@ -26,6 +27,7 @@ import org.example.pipeline.domain.DocumentRepository
 import org.example.pipeline.domain.FileStorageService
 import org.example.pipeline.domain.QueuePublisher
 import org.koin.dsl.module
+import kotlin.time.Duration.Companion.minutes
 import org.koin.ktor.plugin.Koin
 import java.util.UUID
 import kotlin.time.Clock
@@ -77,6 +79,14 @@ class DocumentRoutesStressTest : FunSpec({
                     isLenient = true
                     ignoreUnknownKeys = true
                 })
+            }
+            install(RateLimit) {
+                register(RateLimitName("upload")) {
+                    rateLimiter(limit = 10_000, refillPeriod = 1.minutes)
+                }
+                register(RateLimitName("global")) {
+                    rateLimiter(limit = 10_000, refillPeriod = 1.minutes)
+                }
             }
             install(StatusPages) {
                 exception<IllegalArgumentException> { call, cause ->

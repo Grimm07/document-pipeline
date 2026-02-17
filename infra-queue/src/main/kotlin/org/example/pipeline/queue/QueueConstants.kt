@@ -20,6 +20,12 @@ object QueueConstants {
     /** Dead letter queue for failed messages */
     const val DLX_QUEUE = "document.dlx.queue"
 
+    /** Parking lot exchange for permanently failed messages */
+    const val PARKING_LOT_EXCHANGE = "document.parking-lot.exchange"
+
+    /** Parking lot queue for permanently failed messages requiring manual inspection */
+    const val PARKING_LOT_QUEUE = "document.parking-lot.queue"
+
     /** Content type for JSON messages */
     const val CONTENT_TYPE_JSON = "application/json"
 }

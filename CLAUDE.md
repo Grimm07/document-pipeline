@@ -205,6 +205,7 @@ ml-service/ ────── (Python FastAPI, pip-managed) ◀── app-worke
 - **Structured JSON logging**: LogstashEncoder (Kotlin) and python-json-logger (Python). Dev mode uses plain text (`-Dlogback.configurationFile=logback-text.xml` in `dev.sh`).
 - **Container images**: Jib (Gradle plugin) for backend images (`app-api`, `app-worker`) — no Dockerfiles, layered JRE images from `eclipse-temurin:21-jre-alpine`. Multi-stage Dockerfile for frontend (Node build → nginx). All pushed to `ghcr.io/grimm07/document-pipeline-*`. ML service uses existing Dockerfile in `docker/`.
 - **CI/CD**: GitHub Actions — `ci.yml` (8 parallel PR check jobs), `release.yml` (auto-version → image build → Trivy scan → GitHub Release), `codeql.yml` (SAST for Kotlin, JS/TS, Python). Dependabot watches 4 ecosystems (Gradle, npm, pip, GitHub Actions).
+- **Input validation**: Konform declarative validators in `app-api/.../validation/Validators.kt` as standalone `val` objects. Generic `T.validate(Validation<T>)` extension in `ValidationSupport.kt` throws `ValidationException(fieldErrors)`, caught by Ktor `StatusPages`. Query params parsed into wrapper DTOs (`ListQueryParams`, `SearchQueryParams`, `UploadParams`) for structured validation.
 
 ### Two Runnable Applications
 
@@ -230,7 +231,7 @@ Note the DI asymmetry: API module is a top-level `val`; worker module is a funct
 
 ## Tech Stack
 
-**Backend**: Kotlin 2.2, JVM 21, Gradle version catalog (`gradle/libs.versions.toml`), Ktor 3.2 (Netty API / CIO worker client), kotlinx.serialization, kotlinx.datetime, Koin DI, Exposed DSL, Flyway, HikariCP, RabbitMQ, Micrometer 1.14 + Prometheus, LogstashEncoder (JSON logging), Detekt 1.23.8
+**Backend**: Kotlin 2.2, JVM 21, Gradle version catalog (`gradle/libs.versions.toml`), Ktor 3.2 (Netty API / CIO worker client), kotlinx.serialization, kotlinx.datetime, Koin DI, Exposed DSL, Flyway, HikariCP, RabbitMQ, Konform 0.11 (validation), Micrometer 1.14 + Prometheus, LogstashEncoder (JSON logging), Detekt 1.23.8
 **Frontend**: React 19, TypeScript 5, Vite 6, TanStack Router + Query + Form, Tailwind CSS v4, shadcn/ui, pdfjs-dist + openseadragon, ESLint 9 + Prettier 3
 **ML Service**: Python 3.12, FastAPI, Transformers (DeBERTa-v3-large NLI), GOT-OCR2, PaddleOCR, PyMuPDF, prometheus-client + prometheus-fastapi-instrumentator, python-json-logger, Ruff
 **Testing**: Kotest 6 (FunSpec) + JUnit 5 + Testcontainers + MockK (backend), Vitest + RTL + MSW + Playwright (frontend), pytest (ML)
@@ -253,6 +254,7 @@ Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATA
 - **Commit style**: conventional commits required (`feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `perf:`, `chore:`, `ci:`, `style:`) — these feed the auto-generated changelog
 - **Commit linting**: Enforced by Lefthook + Cocogitto `commit-msg` hook. Run `lefthook install` after cloning.
 - **Changelog**: auto-generated via [git-cliff](https://git-cliff.org) from conventional commits. Config in `cliff.toml`. Regenerate with `git-cliff --output CHANGELOG.md`
+- **Merge policy**: Squash merges only — merge commits are rejected by repo settings. Use `gh pr merge --squash`.
 
 ## Gotchas
 
@@ -282,6 +284,9 @@ Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATA
 - **Prometheus `host.docker.internal` on Docker Desktop + WSL2** — Docker Desktop resolves `host.docker.internal` to the VM gateway (`192.168.65.254`), which can't route to WSL2 host services. Fix: `extra_hosts: ["host.docker.internal:${HOST_IP:-host-gateway}"]` in docker-compose, with `dev.sh` exporting `HOST_IP` from `eth0`. Container-to-container targets (ml-service, rabbitmq) use Docker DNS names. `network_mode: host` does NOT work on Docker Desktop (binds to VM, not WSL2 host).
 - **Old queue messages without `correlationId`** — backward compatible. Field defaults to `null`, consumer's Json uses `ignoreUnknownKeys = true`.
 - **LogstashEncoder brings jackson-databind transitively** — no conflict with kotlinx.serialization (independent serialization systems).
+- **Konform 0.11.0 deprecated package** — use `io.konform.validation.constraints` for `maxLength`, `minimum`, `maximum`, `minItems`. The old `io.konform.validation.jsonschema` package still compiles but is deprecated.
+- **kotlinx.serialization `encodeDefaults = false`** (the default) — fields with default values are omitted from JSON output. Never give `@Serializable` data class fields defaults if they must always appear in responses (e.g., `error` field in error DTOs).
+- **Detekt `MatchingDeclarationName`** — triggered when a file contains multiple top-level declarations where none matches the filename. Suppress with `@file:Suppress("MatchingDeclarationName")` when grouping related declarations intentionally.
 
 ### Database / Infrastructure
 

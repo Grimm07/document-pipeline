@@ -247,7 +247,7 @@ class ExposedDocumentRepositoryStressTest : FunSpec({
             }
         }
 
-        test("10 updates to same doc: last-writer-wins, no crash") {
+        test("10 concurrent updates to same doc: exactly one wins (idempotency guard)") {
             val id = UUID.randomUUID().toString()
             repo.insert(testDocument(id = id))
 
@@ -264,10 +264,10 @@ class ExposedDocumentRepositoryStressTest : FunSpec({
                     }
                 }.awaitAll()
 
-                results.forEach { r ->
-                    withClue("client=${r.clientId}, docId=${r.docId}") {
-                        r.success.shouldBeTrue()
-                    }
+                // Idempotency guard: exactly one update should succeed (the first to run)
+                val successes = results.filter { it.success }
+                withClue("exactly one concurrent update should win") {
+                    successes.shouldHaveSize(1)
                 }
             }
 

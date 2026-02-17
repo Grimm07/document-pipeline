@@ -86,7 +86,7 @@ class RabbitMQConsumer(
     }
 
     /**
-     * Declares the queue topology (should match publisher).
+     * Declares the queue topology (must match publisher and DLQ reprocessor).
      */
     private fun declareTopology(channel: Channel) {
         channel.exchangeDeclare(QueueConstants.DOCUMENT_EXCHANGE, "topic", true)
@@ -104,6 +104,9 @@ class RabbitMQConsumer(
             QueueConstants.DOCUMENT_EXCHANGE,
             QueueConstants.CLASSIFICATION_ROUTING_KEY
         )
+        channel.exchangeDeclare(QueueConstants.PARKING_LOT_EXCHANGE, "fanout", true)
+        channel.queueDeclare(QueueConstants.PARKING_LOT_QUEUE, true, false, false, null)
+        channel.queueBind(QueueConstants.PARKING_LOT_QUEUE, QueueConstants.PARKING_LOT_EXCHANGE, "")
         logger.info("RabbitMQ topology declared (consumer)")
     }
 

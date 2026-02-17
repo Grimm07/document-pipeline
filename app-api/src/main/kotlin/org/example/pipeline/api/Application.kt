@@ -11,6 +11,7 @@ import io.ktor.server.plugins.callid.*
 import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
+import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics
@@ -31,6 +32,7 @@ import org.koin.ktor.plugin.Koin
 import org.koin.logger.slf4jLogger
 import org.slf4j.LoggerFactory
 import org.slf4j.event.Level
+import kotlin.time.Duration.Companion.seconds
 
 private val logger = LoggerFactory.getLogger("Application")
 
@@ -39,6 +41,15 @@ private const val DEFAULT_SERVER_PORT = 8080
 
 /** Maximum allowed length for correlation IDs. */
 private const val MAX_CALL_ID_LENGTH = 200
+
+/** Default upload rate limit (requests per refill period). */
+private const val DEFAULT_UPLOAD_RATE_LIMIT = 10
+
+/** Default global rate limit (requests per refill period). */
+private const val DEFAULT_GLOBAL_RATE_LIMIT = 100
+
+/** Default rate limit refill period in seconds. */
+private const val DEFAULT_REFILL_SECONDS = 60
 
 /**
  * Entry point for the Document Pipeline API server.
@@ -111,6 +122,27 @@ fun Application.module() {
         allowHeader(HttpHeaders.Accept)
         allowHeader(HttpHeaders.XRequestId)
         exposeHeader(HttpHeaders.XRequestId)
+    }
+
+    // Install rate limiting per client IP
+    val uploadLimit = config.propertyOrNull("rateLimit.uploadLimit")
+        ?.getString()?.toIntOrNull() ?: DEFAULT_UPLOAD_RATE_LIMIT
+    val uploadRefillSecs = config.propertyOrNull("rateLimit.uploadRefillSeconds")
+        ?.getString()?.toLongOrNull() ?: DEFAULT_REFILL_SECONDS.toLong()
+    val globalLimit = config.propertyOrNull("rateLimit.globalLimit")
+        ?.getString()?.toIntOrNull() ?: DEFAULT_GLOBAL_RATE_LIMIT
+    val globalRefillSecs = config.propertyOrNull("rateLimit.globalRefillSeconds")
+        ?.getString()?.toLongOrNull() ?: DEFAULT_REFILL_SECONDS.toLong()
+
+    install(RateLimit) {
+        register(RateLimitName("upload")) {
+            rateLimiter(limit = uploadLimit, refillPeriod = uploadRefillSecs.seconds)
+            requestKey { call -> call.request.local.remoteHost }
+        }
+        register(RateLimitName("global")) {
+            rateLimiter(limit = globalLimit, refillPeriod = globalRefillSecs.seconds)
+            requestKey { call -> call.request.local.remoteHost }
+        }
     }
 
     // Install content negotiation with JSON
