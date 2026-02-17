@@ -329,6 +329,29 @@ class ExposedDocumentRepositoryTest : FunSpec({
             fetched.shouldNotBeNull()
             fetched.labelScores.shouldBeNull()
         }
+
+        test("is idempotent — second ML update returns false") {
+            val doc = repo.insert(testDocument())
+            repo.updateClassification(doc.id, "invoice", 0.9f).shouldBeTrue()
+            repo.updateClassification(doc.id, "receipt", 0.8f).shouldBeFalse()
+            // First classification wins
+            val fetched = repo.getById(doc.id)
+            fetched.shouldNotBeNull()
+            fetched.classification shouldBe "invoice"
+            fetched.confidence shouldBe 0.9f
+        }
+
+        test("does not overwrite manual correction") {
+            val doc = repo.insert(testDocument())
+            repo.updateClassification(doc.id, "invoice", 0.9f).shouldBeTrue()
+            repo.correctClassification(doc.id, "contract").shouldBeTrue()
+            // Stale ML message arrives
+            repo.updateClassification(doc.id, "receipt", 0.8f).shouldBeFalse()
+            val fetched = repo.getById(doc.id)
+            fetched.shouldNotBeNull()
+            fetched.classification shouldBe "contract"
+            fetched.classificationSource shouldBe "manual"
+        }
     }
 
     context("correctClassification") {

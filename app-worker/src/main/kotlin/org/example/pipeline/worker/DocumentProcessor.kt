@@ -55,7 +55,7 @@ class DocumentProcessor(
             labelScores = result.labelScores
         )
         if (!updated) {
-            logger.warn("Failed to update classification for document: {}", documentId)
+            logger.warn("Skipped classification update for document {} (already classified or manually corrected)", documentId)
         } else {
             logger.info("Document {} classified as {} (confidence: {})", documentId, result.classification, result.confidence)
         }

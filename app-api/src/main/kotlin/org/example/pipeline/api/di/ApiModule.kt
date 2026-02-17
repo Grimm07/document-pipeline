@@ -11,6 +11,7 @@ import org.example.pipeline.domain.FileStorageService
 import org.example.pipeline.domain.QueuePublisher
 import org.example.pipeline.queue.RabbitMQConfig
 import org.example.pipeline.queue.RabbitMQPublisher
+import org.example.pipeline.queue.RetryConfig
 import org.example.pipeline.storage.LocalFileStorageService
 import org.koin.dsl.module
 import org.koin.dsl.onClose
@@ -81,8 +82,17 @@ val apiModule = module {
         )
     }
 
-    // Queue publisher
+    // Queue publisher with retry config
     single<QueuePublisher> {
-        RabbitMQPublisher(get())
+        val config = get<HoconApplicationConfig>()
+        val retryConfig = RetryConfig(
+            maxRetries = config.propertyOrNull("rabbitmq.publish.maxRetries")
+                ?.getString()?.toIntOrNull() ?: 3,
+            baseDelayMs = config.propertyOrNull("rabbitmq.publish.baseDelayMs")
+                ?.getString()?.toLongOrNull() ?: 500L,
+            maxDelayMs = config.propertyOrNull("rabbitmq.publish.maxDelayMs")
+                ?.getString()?.toLongOrNull() ?: 10_000L
+        )
+        RabbitMQPublisher(get(), retryConfig)
     }
 }

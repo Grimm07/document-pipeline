@@ -13,6 +13,7 @@ import io.ktor.server.application.*
 import io.ktor.server.config.*
 import io.ktor.server.plugins.callid.*
 import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import io.ktor.server.testing.*
@@ -34,6 +35,7 @@ import org.koin.ktor.plugin.Koin
 import java.util.UUID
 import kotlin.io.path.createTempDirectory
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
 
 class DocumentRoutesTest : FunSpec({
 
@@ -84,6 +86,14 @@ class DocumentRoutesTest : FunSpec({
                     isLenient = true
                     ignoreUnknownKeys = true
                 })
+            }
+            install(RateLimit) {
+                register(RateLimitName("upload")) {
+                    rateLimiter(limit = 1000, refillPeriod = 1.minutes)
+                }
+                register(RateLimitName("global")) {
+                    rateLimiter(limit = 1000, refillPeriod = 1.minutes)
+                }
             }
             install(StatusPages) {
                 exception<ValidationException> { call, cause ->
@@ -717,6 +727,14 @@ class DocumentRoutesTest : FunSpec({
                         install(ContentNegotiation) {
                             json(Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true })
                         }
+                        install(RateLimit) {
+                            register(RateLimitName("upload")) {
+                                rateLimiter(limit = 1000, refillPeriod = 1.minutes)
+                            }
+                            register(RateLimitName("global")) {
+                                rateLimiter(limit = 1000, refillPeriod = 1.minutes)
+                            }
+                        }
                         install(StatusPages) {
                             exception<Throwable> { call, _ ->
                                 call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "Internal server error"))
@@ -777,6 +795,14 @@ class DocumentRoutesTest : FunSpec({
                         }
                         install(ContentNegotiation) {
                             json(Json { prettyPrint = true; isLenient = true; ignoreUnknownKeys = true })
+                        }
+                        install(RateLimit) {
+                            register(RateLimitName("upload")) {
+                                rateLimiter(limit = 1000, refillPeriod = 1.minutes)
+                            }
+                            register(RateLimitName("global")) {
+                                rateLimiter(limit = 1000, refillPeriod = 1.minutes)
+                            }
                         }
                         documentRoutes()
                     }

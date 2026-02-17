@@ -130,7 +130,9 @@ class ExposedDocumentRepository : DocumentRepository {
         val now = OffsetDateTime.ofInstant(
             Clock.System.now().toJavaInstant(), ZoneOffset.UTC
         )
-        val updatedCount = DocumentsTable.update({ DocumentsTable.id eq uuid }) {
+        val updatedCount = DocumentsTable.update({
+            (DocumentsTable.id eq uuid) and (DocumentsTable.classification eq "unclassified")
+        }) {
             it[DocumentsTable.classification] = classification
             it[DocumentsTable.confidence] = confidence
             it[DocumentsTable.classificationSource] = "ml"

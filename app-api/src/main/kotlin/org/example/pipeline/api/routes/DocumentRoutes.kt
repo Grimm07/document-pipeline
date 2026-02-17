@@ -5,6 +5,7 @@ import io.ktor.http.content.*
 import io.ktor.server.application.*
 import io.ktor.server.config.*
 import io.ktor.server.plugins.callid.*
+import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -51,6 +52,7 @@ fun Application.documentRoutes() {
     routing {
         route("/api/documents") {
 
+            rateLimit(RateLimitName("upload")) {
             post("/upload") {
                 val multipart = call.receiveMultipart(formFieldLimit = maxFileSize)
 
@@ -104,7 +106,9 @@ fun Application.documentRoutes() {
 
                 call.respond(HttpStatusCode.OK, saved.toResponse())
             }
+            } // end rateLimit("upload")
 
+            rateLimit(RateLimitName("global")) {
             get("/search") {
                 val metadataParams = call.request.queryParameters
                     .entries()
@@ -367,6 +371,7 @@ fun Application.documentRoutes() {
                 )
                 call.respond(HttpStatusCode.OK, response)
             }
+            } // end rateLimit("global")
         }
     }
 }
