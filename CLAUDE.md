@@ -206,6 +206,10 @@ ml-service/ ────── (Python FastAPI, pip-managed) ◀── app-worke
 - **Container images**: Jib (Gradle plugin) for backend images (`app-api`, `app-worker`) — no Dockerfiles, layered JRE images from `eclipse-temurin:21-jre-alpine`. Multi-stage Dockerfile for frontend (Node build → nginx). All pushed to `ghcr.io/grimm07/document-pipeline-*`. ML service uses existing Dockerfile in `docker/`.
 - **CI/CD**: GitHub Actions — `ci.yml` (8 parallel PR check jobs), `release.yml` (auto-version → image build → Trivy scan → GitHub Release), `codeql.yml` (SAST for Kotlin, JS/TS, Python). Dependabot watches 4 ecosystems (Gradle, npm, pip, GitHub Actions).
 - **Input validation**: Konform declarative validators in `app-api/.../validation/Validators.kt` as standalone `val` objects. Generic `T.validate(Validation<T>)` extension in `ValidationSupport.kt` throws `ValidationException(fieldErrors)`, caught by Ktor `StatusPages`. Query params parsed into wrapper DTOs (`ListQueryParams`, `SearchQueryParams`, `UploadParams`) for structured validation.
+- **Circuit breaker**: `CircuitBreakerClassificationService` decorates `ClassificationService` with CLOSED/OPEN/HALF_OPEN states (lock-free `AtomicReference` CAS). Config via `mlService.circuitBreaker.*` in worker HOCON. `CircuitBreakerOpenException` triggers nack → dead-letter.
+- **Rate limiting**: Ktor `RateLimit` plugin with `"upload"` (10/min) and `"global"` (100/min) zones per client IP. Config via `rateLimit.*` in API HOCON with env var overrides (`RATE_LIMIT_UPLOAD`, etc.).
+- **Idempotency guard**: `updateClassification()` has `WHERE classification = 'unclassified'` — ML can only classify unclassified documents. Redelivered messages and manual corrections are protected.
+- **Deep health checks**: API `/api/health` probes DataSource + RabbitMQ, returns 200/503. Worker `/health` on metrics port checks RabbitMQ.
 
 ### Two Runnable Applications
 
@@ -287,6 +291,10 @@ Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATA
 - **Konform 0.11.0 deprecated package** — use `io.konform.validation.constraints` for `maxLength`, `minimum`, `maximum`, `minItems`. The old `io.konform.validation.jsonschema` package still compiles but is deprecated.
 - **kotlinx.serialization `encodeDefaults = false`** (the default) — fields with default values are omitted from JSON output. Never give `@Serializable` data class fields defaults if they must always appear in responses (e.g., `error` field in error DTOs).
 - **Detekt `MatchingDeclarationName`** — triggered when a file contains multiple top-level declarations where none matches the filename. Suppress with `@file:Suppress("MatchingDeclarationName")` when grouping related declarations intentionally.
+- **Detekt `OutdatedDocumentation` on data classes** — KDoc must use `@property` (not `@param`) for constructor properties, otherwise Detekt reports the param as undocumented.
+- **Ktor `RateLimit` plugin (3.4.0)** — use `rateLimiter(limit = N, refillPeriod = M.seconds)` (function call, not property assignment). Client IP via `call.request.local.remoteHost` (not `origin.remoteAddress`). No `RateLimitException` — plugin returns 429 directly via interceptors.
+- **`rateLimit()` route blocks require `RateLimit` plugin installed** — routes wrapped in `rateLimit(RateLimitName("..."))` are unreachable without the plugin. Every test file with its own `application {}` setup must install it independently.
+- **`call.respond()` with mixed-type maps fails** — kotlinx.serialization can't serialize `Map<String, Any>`. Use `buildJsonObject {}` + `call.respondText(body.toString(), ContentType.Application.Json, status)` instead.
 
 ### Database / Infrastructure
 
@@ -370,6 +378,7 @@ Both apps use HOCON with env var overrides. Key variables: `DATABASE_URL`, `DATA
 - **Two-tier ML mocking** — unit tests mock internals (`service._pipeline = MagicMock()`); pipeline tests use `create_autospec()`. Don't mix.
 - **SIGBUS can't be caught** — use subprocess probe to detect if `from transformers import pipeline` works.
 - **Mocking uninstalled lazy imports** — inject mock into `sys.modules["paddleocr"]` before `load()`, not `@patch()` (fails with `ModuleNotFoundError`). Mock `TextDetection` (not `PaddleOCR`).
+- **Integration tests with inline `application {}` setups** — must install ALL plugins that production routes depend on (RateLimit, ContentNegotiation, etc.). Tests using a shared `setupApp()` helper get these automatically, but standalone integration tests are easily missed.
 
 ## Automations
 
