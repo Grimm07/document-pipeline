@@ -22,7 +22,7 @@ mockk = "1.14.9"
 testcontainers = "1.21.4"
 detekt = "1.23.8"
 jib = "3.4.4"
-konform = "0.11.0"
+konform = "0.11.1"
 [libraries]
 # Kotlin
 kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
