@@ -81,7 +81,7 @@ jobs:
         run: ./gradlew :app-worker:jib --no-configuration-cache -Djib.to.tags=latest,"$GIT_SHA","$VERSION"
 
       - name: Build & push Frontend image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: frontend
           push: true
